@@ -1,12 +1,21 @@
 import { useEffect, useState } from 'react'
+import { KeyRound, Plus, ShieldCheck, Trash2, TriangleAlert } from 'lucide-react'
 import { api } from '../api.js'
+import { Button } from './ui/button.jsx'
+import { Input } from './ui/input.jsx'
+import { Label } from './ui/label.jsx'
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card.jsx'
+import { Alert, AlertDescription } from './ui/alert.jsx'
+import { Badge } from './ui/badge.jsx'
+import { cn } from '../lib/utils.js'
 
 export default function Users() {
   const [users, setUsers] = useState([])
   const [roles, setRoles] = useState([])
   const [error, setError] = useState('')
-  const [form, setForm] = useState({ username: '', fullName: '', email: '' })
-  const [assigning, setAssigning] = useState(null) // user id currently editing roles for
+  const [form, setForm] = useState({ username: '', fullName: '', email: '', password: '' })
+  const [panel, setPanel] = useState(null) // { userId, mode: 'roles' | 'password' }
+  const [passwordInput, setPasswordInput] = useState('')
 
   const load = () => Promise.all([api.listUsers(), api.listRoles()])
     .then(([u, r]) => { setUsers(u); setRoles(r) })
@@ -18,8 +27,8 @@ export default function Users() {
     e.preventDefault()
     setError('')
     try {
-      await api.createUser({ ...form, isActive: true, roleIds: [] })
-      setForm({ username: '', fullName: '', email: '' })
+      await api.createUser({ ...form, isActive: true })
+      setForm({ username: '', fullName: '', email: '', password: '' })
       load()
     } catch (e) {
       setError(e.message)
@@ -40,69 +49,157 @@ export default function Users() {
     load()
   }
 
+  const submitPassword = async (userId) => {
+    setError('')
+    try {
+      await api.setUserPassword(userId, passwordInput)
+      setPasswordInput('')
+      setPanel(null)
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
   const roleName = (id) => roles.find((r) => r.id === id)?.name || id
 
   return (
-    <div className="panel">
-      {error && <div className="error">{error}</div>}
+    <div className="flex flex-col gap-6">
+      {error && (
+        <Alert variant="destructive">
+          <TriangleAlert />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-      <form className="inline-form" onSubmit={submit}>
-        <label>
-          Username
-          <input type="text" required value={form.username}
-            onChange={(e) => setForm({ ...form, username: e.target.value })} />
-        </label>
-        <label>
-          Full name
-          <input type="text" required value={form.fullName}
-            onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
-        </label>
-        <label>
-          Email
-          <input type="email" required value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })} />
-        </label>
-        <button className="btn-primary" type="submit">Add User</button>
-      </form>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Add user</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={submit} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
+            <div className="grid gap-1.5">
+              <Label htmlFor="u-username">Username</Label>
+              <Input id="u-username" required value={form.username}
+                onChange={(e) => setForm({ ...form, username: e.target.value })} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="u-fullname">Full name</Label>
+              <Input id="u-fullname" required value={form.fullName}
+                onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="u-email">Email</Label>
+              <Input id="u-email" type="email" required value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="u-password">Password</Label>
+              <Input id="u-password" type="password" required minLength={6} placeholder="min 6 chars"
+                value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            </div>
+            <Button type="submit">
+              <Plus />
+              Add user
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
-      <div className="table-wrap">
-      <table>
-        <thead>
-          <tr><th>Username</th><th>Full name</th><th>Email</th><th>Roles</th><th></th></tr>
-        </thead>
-        <tbody>
-          {users.map((u) => (
-            <tr key={u.id}>
-              <td>{u.username}</td>
-              <td>{u.fullName}</td>
-              <td className="muted">{u.email}</td>
-              <td>
-                {u.roleIds.map((id) => <span key={id} className="badge">{roleName(id)}</span>)}
-                {assigning === u.id && (
-                  <div style={{ marginTop: 6 }}>
-                    {roles.map((r) => (
-                      <label key={r.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginRight: 8, fontSize: 12 }}>
-                        <input type="checkbox" checked={u.roleIds.includes(r.id)} onChange={() => toggleRole(u, r.id)} />
-                        {r.name}
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </td>
-              <td className="row-actions">
-                <button className="btn-secondary" onClick={() => setAssigning(assigning === u.id ? null : u.id)}>
-                  {assigning === u.id ? 'Done' : 'Assign roles'}
-                </button>
-                <button className="btn-danger" onClick={() => remove(u.id)}>Delete</button>
-              </td>
-            </tr>
-          ))}
-          {users.length === 0 && (
-            <tr><td colSpan={5} className="muted">No users yet.</td></tr>
-          )}
-        </tbody>
-      </table>
-      </div>
+      <Card>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <th className="px-4 py-3 font-medium">Username</th>
+                <th className="px-4 py-3 font-medium">Full name</th>
+                <th className="px-4 py-3 font-medium">Email</th>
+                <th className="px-4 py-3 font-medium">Roles</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u) => {
+                const isRolesOpen = panel?.userId === u.id && panel.mode === 'roles'
+                const isPasswordOpen = panel?.userId === u.id && panel.mode === 'password'
+                return (
+                  <tr key={u.id} className="border-b last:border-0 align-top hover:bg-muted/40">
+                    <td className="px-4 py-3 font-medium">{u.username}</td>
+                    <td className="px-4 py-3">{u.fullName}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {u.roleIds.map((id) => <Badge key={id} variant="secondary">{roleName(id)}</Badge>)}
+                      </div>
+                      {isRolesOpen && (
+                        <div className="mt-2 flex flex-wrap gap-2 rounded-md border bg-muted/30 p-2">
+                          {roles.map((r) => {
+                            const selected = u.roleIds.includes(r.id)
+                            return (
+                              <button
+                                key={r.id}
+                                type="button"
+                                onClick={() => toggleRole(u, r.id)}
+                                className={cn(
+                                  'rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors',
+                                  selected
+                                    ? 'border-primary bg-primary text-primary-foreground'
+                                    : 'border-input bg-background hover:bg-accent'
+                                )}
+                              >
+                                {r.name}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
+                      {isPasswordOpen && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <Input
+                            type="password"
+                            autoFocus
+                            placeholder="New password"
+                            className="h-8 max-w-48"
+                            value={passwordInput}
+                            onChange={(e) => setPasswordInput(e.target.value)}
+                          />
+                          <Button size="sm" onClick={() => submitPassword(u.id)}>Save</Button>
+                          <Button size="sm" variant="ghost" onClick={() => { setPanel(null); setPasswordInput('') }}>Cancel</Button>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost" size="icon"
+                          title="Assign roles"
+                          onClick={() => setPanel(isRolesOpen ? null : { userId: u.id, mode: 'roles' })}
+                        >
+                          <ShieldCheck className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost" size="icon"
+                          title="Set password"
+                          onClick={() => { setPanel(isPasswordOpen ? null : { userId: u.id, mode: 'password' }); setPasswordInput('') }}
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" title="Delete" onClick={() => remove(u.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+              {users.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No users yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   )
 }

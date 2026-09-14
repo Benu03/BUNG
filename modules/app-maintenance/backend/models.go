@@ -62,3 +62,11 @@ type AuthUser struct {
 	Email    string    `json:"email"`
 	Modules  []*Module `json:"modules"`
 }
+
+// SiteSettings controls content shown on the portal's public landing page.
+type SiteSettings struct {
+	SiteName     string    `json:"siteName"`
+	Tagline      string    `json:"tagline"`
+	Announcement string    `json:"announcement"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+}

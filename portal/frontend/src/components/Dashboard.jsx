@@ -1,23 +1,46 @@
-import { ArrowRight, Boxes, LogOut, PackageOpen } from 'lucide-react'
+import { ArrowRight, Boxes, LogOut, Megaphone, PackageOpen } from 'lucide-react'
 import { Button } from './ui/button.jsx'
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from './ui/card.jsx'
+import { Alert, AlertDescription } from './ui/alert.jsx'
 
-export default function Dashboard({ user, onLogout }) {
+const ICON_GRADIENTS = [
+  'from-violet-500 to-fuchsia-500',
+  'from-sky-500 to-cyan-400',
+  'from-amber-500 to-orange-500',
+  'from-emerald-500 to-teal-400',
+  'from-rose-500 to-pink-500',
+  'from-indigo-500 to-blue-500',
+]
+
+function initials(name) {
+  return name
+    .split(' ')
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+}
+
+export default function Dashboard({ user, onLogout, settings }) {
   const modules = user.modules || []
 
   return (
-    <div className="min-h-svh bg-muted/40">
-      <header className="border-b bg-background">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+    <div className="min-h-svh bg-muted/30">
+      <header className="sticky top-0 z-10 bg-gradient-to-r from-primary to-primary-dark text-primary-foreground shadow-md">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3.5">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15">
               <Boxes className="h-4 w-4" />
             </div>
-            <span className="font-semibold tracking-tight">BUNG</span>
+            <span className="font-semibold tracking-tight">{settings.siteName}</span>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground">{user.fullName || user.username}</span>
-            <Button variant="outline" size="sm" onClick={onLogout}>
+            <span className="text-sm text-primary-foreground/80">{user.fullName || user.username}</span>
+            <Button
+              size="sm"
+              onClick={onLogout}
+              className="border border-white/25 bg-white/10 text-primary-foreground shadow-none hover:bg-white/20"
+            >
               <LogOut />
               Logout
             </Button>
@@ -26,13 +49,20 @@ export default function Dashboard({ user, onLogout }) {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-10">
+        {settings.announcement && (
+          <Alert className="mb-6">
+            <Megaphone />
+            <AlertDescription>{settings.announcement}</AlertDescription>
+          </Alert>
+        )}
+
         <div className="mb-8">
           <h1 className="text-2xl font-semibold tracking-tight">Your modules</h1>
           <p className="text-sm text-muted-foreground">Pick a module to get started.</p>
         </div>
 
         {modules.length === 0 ? (
-          <Card className="flex flex-col items-center gap-2 border-dashed py-16 text-center">
+          <Card className="flex flex-col items-center gap-2 rounded-2xl border-dashed py-16 text-center">
             <PackageOpen className="h-8 w-8 text-muted-foreground" />
             <p className="font-medium">No modules assigned yet</p>
             <p className="max-w-xs text-sm text-muted-foreground">
@@ -41,15 +71,20 @@ export default function Dashboard({ user, onLogout }) {
           </Card>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {modules.map((m) => (
+            {modules.map((m, i) => (
               <a key={m.code} href={`/${m.code}/`} className="group">
-                <Card className="h-full transition-colors group-hover:border-foreground/30">
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      {m.name}
-                      <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
-                    </CardTitle>
-                    {m.description && <CardDescription>{m.description}</CardDescription>}
+                <Card className="h-full rounded-2xl border-border/60 shadow-sm transition-all duration-200 group-hover:-translate-y-0.5 group-hover:shadow-lg">
+                  <CardHeader className="gap-3">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br text-sm font-semibold text-white ${ICON_GRADIENTS[i % ICON_GRADIENTS.length]}`}>
+                      {initials(m.name)}
+                    </div>
+                    <div>
+                      <CardTitle className="flex items-center justify-between text-base">
+                        {m.name}
+                        <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+                      </CardTitle>
+                      {m.description && <CardDescription className="mt-1">{m.description}</CardDescription>}
+                    </div>
                   </CardHeader>
                   <CardFooter>
                     <span className="text-xs text-muted-foreground">/{m.code}/</span>

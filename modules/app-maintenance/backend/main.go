@@ -62,6 +62,12 @@ func main() {
 	mux.HandleFunc("PUT /modules/{id}", a.updateModule)
 	mux.HandleFunc("DELETE /modules/{id}", a.deleteModule)
 
+	mux.HandleFunc("GET /settings", a.getSettings)
+	mux.HandleFunc("PUT /settings", a.updateSettings)
+	mux.HandleFunc("GET /settings/public", a.getPublicSettings) // public, see nginx.conf
+
+	mux.HandleFunc("GET /audit-log", a.listAuditLog)
+
 	log.Printf("app-maintenance-backend listening on :%s", port)
 	if err := http.ListenAndServe(":"+port, mux); err != nil {
 		log.Fatal(err)

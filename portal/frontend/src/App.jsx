@@ -3,9 +3,12 @@ import Login from './components/Login.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import { LoaderCircle } from 'lucide-react'
 
+const DEFAULT_SETTINGS = { siteName: 'BUNG', tagline: 'Sign in to access your modules', announcement: '' }
+
 export default function App() {
   const [user, setUser] = useState(undefined) // undefined = loading, null = logged out
   const [notice, setNotice] = useState('')
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS)
 
   const loadMe = () => {
     fetch('/app-maintenance/api/auth/me')
@@ -18,6 +21,10 @@ export default function App() {
     const params = new URLSearchParams(window.location.search)
     if (params.get('login_required')) setNotice('Please sign in to continue.')
     loadMe()
+    fetch('/app-maintenance/api/settings/public')
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then(setSettings)
+      .catch(() => {}) // keep defaults if app-maintenance isn't reachable yet
   }, [])
 
   const logout = async () => {
@@ -34,8 +41,8 @@ export default function App() {
   }
 
   if (!user) {
-    return <Login notice={notice} onLoggedIn={setUser} />
+    return <Login notice={notice} onLoggedIn={setUser} settings={settings} />
   }
 
-  return <Dashboard user={user} onLogout={logout} />
+  return <Dashboard user={user} onLogout={logout} settings={settings} />
 }

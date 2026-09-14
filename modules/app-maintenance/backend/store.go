@@ -406,3 +406,29 @@ func (s *Store) DeleteModule(id string) error {
 	}
 	return nil
 }
+
+// ---- site settings ----
+
+func (s *Store) GetSiteSettings() (*SiteSettings, error) {
+	var st SiteSettings
+	err := s.db.QueryRow(`SELECT site_name, tagline, announcement, updated_at FROM site_settings WHERE id = 'default'`).
+		Scan(&st.SiteName, &st.Tagline, &st.Announcement, &st.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &st, nil
+}
+
+func (s *Store) UpdateSiteSettings(in *SiteSettings) (*SiteSettings, error) {
+	_, err := s.db.Exec(
+		`UPDATE site_settings SET site_name = $1, tagline = $2, announcement = $3, updated_at = now() WHERE id = 'default'`,
+		in.SiteName, in.Tagline, in.Announcement,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return s.GetSiteSettings()
+}

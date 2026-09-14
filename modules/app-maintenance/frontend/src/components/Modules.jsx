@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react'
+import { Plus, Trash2, TriangleAlert } from 'lucide-react'
 import { api } from '../api.js'
+import { Button } from './ui/button.jsx'
+import { Input } from './ui/input.jsx'
+import { Label } from './ui/label.jsx'
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card.jsx'
+import { Alert, AlertDescription } from './ui/alert.jsx'
+import { Badge } from './ui/badge.jsx'
 
 export default function Modules() {
   const [modules, setModules] = useState([])
@@ -29,51 +36,80 @@ export default function Modules() {
   }
 
   return (
-    <div className="panel">
-      {error && <div className="error">{error}</div>}
+    <div className="flex flex-col gap-6">
+      {error && (
+        <Alert variant="destructive">
+          <TriangleAlert />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-      <form className="inline-form" onSubmit={submit}>
-        <label>
-          Code
-          <input type="text" required placeholder="finance"
-            value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
-        </label>
-        <label>
-          Name
-          <input type="text" required placeholder="Finance"
-            value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        </label>
-        <label>
-          Description
-          <input type="text" placeholder="optional"
-            value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-        </label>
-        <button className="btn-primary" type="submit">Add Module</button>
-      </form>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Add module</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={submit} className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_2fr_auto] sm:items-end">
+            <div className="grid gap-1.5">
+              <Label htmlFor="mod-code">Code</Label>
+              <Input id="mod-code" required placeholder="finance"
+                value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="mod-name">Name</Label>
+              <Input id="mod-name" required placeholder="Finance"
+                value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="mod-desc">Description</Label>
+              <Input id="mod-desc" placeholder="optional"
+                value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            </div>
+            <Button type="submit">
+              <Plus />
+              Add
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
-      <div className="table-wrap">
-      <table>
-        <thead>
-          <tr><th>Code</th><th>Name</th><th>Description</th><th>Active</th><th></th></tr>
-        </thead>
-        <tbody>
-          {modules.map((m) => (
-            <tr key={m.id}>
-              <td>{m.code}</td>
-              <td>{m.name}</td>
-              <td className="muted">{m.description}</td>
-              <td>{m.isActive ? 'Yes' : 'No'}</td>
-              <td className="row-actions">
-                <button className="btn-danger" onClick={() => remove(m.id)}>Delete</button>
-              </td>
-            </tr>
-          ))}
-          {modules.length === 0 && (
-            <tr><td colSpan={5} className="muted">No modules yet.</td></tr>
-          )}
-        </tbody>
-      </table>
-      </div>
+      <Card>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <th className="px-4 py-3 font-medium">Code</th>
+                <th className="px-4 py-3 font-medium">Name</th>
+                <th className="px-4 py-3 font-medium">Description</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {modules.map((m) => (
+                <tr key={m.id} className="border-b last:border-0 hover:bg-muted/40">
+                  <td className="px-4 py-3 font-mono text-xs">{m.code}</td>
+                  <td className="px-4 py-3 font-medium">{m.name}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{m.description}</td>
+                  <td className="px-4 py-3">
+                    <Badge variant={m.isActive ? 'default' : 'secondary'}>{m.isActive ? 'Active' : 'Inactive'}</Badge>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Button variant="ghost" size="icon" onClick={() => remove(m.id)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+              {modules.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No modules yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   )
 }

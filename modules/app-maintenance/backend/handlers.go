@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 type api struct {
@@ -83,6 +84,7 @@ func (a *api) createUser(w http.ResponseWriter, r *http.Request) {
 		handleErr(w, err)
 		return
 	}
+	writeAudit(a.store, r, "user.create", "user", u.ID, map[string]any{"username": u.Username})
 	writeJSON(w, http.StatusCreated, u)
 }
 
@@ -107,6 +109,7 @@ func (a *api) setUserPassword(w http.ResponseWriter, r *http.Request) {
 		handleErr(w, err)
 		return
 	}
+	writeAudit(a.store, r, "user.set_password", "user", r.PathValue("id"), nil)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -121,14 +124,17 @@ func (a *api) updateUser(w http.ResponseWriter, r *http.Request) {
 		handleErr(w, err)
 		return
 	}
+	writeAudit(a.store, r, "user.update", "user", u.ID, map[string]any{"username": u.Username})
 	writeJSON(w, http.StatusOK, u)
 }
 
 func (a *api) deleteUser(w http.ResponseWriter, r *http.Request) {
-	if err := a.store.DeleteUser(r.PathValue("id")); err != nil {
+	id := r.PathValue("id")
+	if err := a.store.DeleteUser(id); err != nil {
 		handleErr(w, err)
 		return
 	}
+	writeAudit(a.store, r, "user.delete", "user", id, nil)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -145,6 +151,7 @@ func (a *api) setUserRoles(w http.ResponseWriter, r *http.Request) {
 		handleErr(w, err)
 		return
 	}
+	writeAudit(a.store, r, "user.set_roles", "user", u.ID, map[string]any{"roleIds": in.RoleIDs})
 	writeJSON(w, http.StatusOK, u)
 }
 
@@ -179,6 +186,7 @@ func (a *api) createRole(w http.ResponseWriter, r *http.Request) {
 		handleErr(w, err)
 		return
 	}
+	writeAudit(a.store, r, "role.create", "role", role.ID, map[string]any{"name": role.Name})
 	writeJSON(w, http.StatusCreated, role)
 }
 
@@ -193,14 +201,17 @@ func (a *api) updateRole(w http.ResponseWriter, r *http.Request) {
 		handleErr(w, err)
 		return
 	}
+	writeAudit(a.store, r, "role.update", "role", role.ID, map[string]any{"name": role.Name})
 	writeJSON(w, http.StatusOK, role)
 }
 
 func (a *api) deleteRole(w http.ResponseWriter, r *http.Request) {
-	if err := a.store.DeleteRole(r.PathValue("id")); err != nil {
+	id := r.PathValue("id")
+	if err := a.store.DeleteRole(id); err != nil {
 		handleErr(w, err)
 		return
 	}
+	writeAudit(a.store, r, "role.delete", "role", id, nil)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -235,6 +246,7 @@ func (a *api) createModule(w http.ResponseWriter, r *http.Request) {
 		handleErr(w, err)
 		return
 	}
+	writeAudit(a.store, r, "module.create", "module", m.ID, map[string]any{"code": m.Code})
 	writeJSON(w, http.StatusCreated, m)
 }
 
@@ -249,13 +261,88 @@ func (a *api) updateModule(w http.ResponseWriter, r *http.Request) {
 		handleErr(w, err)
 		return
 	}
+	writeAudit(a.store, r, "module.update", "module", m.ID, map[string]any{"code": m.Code})
 	writeJSON(w, http.StatusOK, m)
 }
 
 func (a *api) deleteModule(w http.ResponseWriter, r *http.Request) {
-	if err := a.store.DeleteModule(r.PathValue("id")); err != nil {
+	id := r.PathValue("id")
+	if err := a.store.DeleteModule(id); err != nil {
 		handleErr(w, err)
 		return
 	}
+	writeAudit(a.store, r, "module.delete", "module", id, nil)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ---- site settings ----
+
+func (a *api) getSettings(w http.ResponseWriter, r *http.Request) {
+	st, err := a.store.GetSiteSettings()
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, st)
+}
+
+func (a *api) updateSettings(w http.ResponseWriter, r *http.Request) {
+	var in SiteSettings
+	if err := decodeJSON(r, &in); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+	st, err := a.store.UpdateSiteSettings(&in)
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+	writeAudit(a.store, r, "settings.update", "site_settings", "default", nil)
+	writeJSON(w, http.StatusOK, st)
+}
+
+// getPublicSettings is reachable without a session (see nginx.conf's exact
+// `/app-maintenance/api/settings/public` bypass) - the portal needs it
+// before a user is logged in, to render the login page.
+func (a *api) getPublicSettings(w http.ResponseWriter, r *http.Request) {
+	st, err := a.store.GetSiteSettings()
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{
+		"siteName":     st.SiteName,
+		"tagline":      st.Tagline,
+		"announcement": st.Announcement,
+	})
+}
+
+// ---- audit log ----
+
+func (a *api) listAuditLog(w http.ResponseWriter, r *http.Request) {
+	limit := queryInt(r, "limit", 50, 200)
+	offset := queryInt(r, "offset", 0, 1_000_000)
+	entries, err := a.store.ListAuditLog(limit, offset)
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, entries)
+}
+
+// queryInt reads an integer query param, falling back to def and clamping
+// to [0, max].
+func queryInt(r *http.Request, key string, def, max int) int {
+	v := r.URL.Query().Get(key)
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 {
+		return def
+	}
+	if n > max {
+		return max
+	}
+	return n
 }

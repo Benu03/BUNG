@@ -23,5 +23,8 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
+# claude code session-local state (not project content)
+.claude/
+
 # docker
 *.pid

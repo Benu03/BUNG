@@ -22,6 +22,7 @@ services:
       - DB_SSLMODE=disable
       - JWT_SECRET=${JWT_SECRET:?set JWT_SECRET in .env}
       - AUTH_TOKEN_TTL_HOURS=${AUTH_TOKEN_TTL_HOURS:-12}
+      - SEED_ADMIN_PASSWORD=${SEED_ADMIN_PASSWORD:-admin123}
     networks:
       - app-network
     depends_on:

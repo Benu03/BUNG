@@ -3,6 +3,8 @@ package main
 import (
 	"database/sql"
 	"errors"
+	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -37,10 +39,11 @@ type authAPI struct {
 	store     *Store
 	jwtSecret []byte
 	tokenTTL  time.Duration
+	limiter   *loginLimiter
 }
 
 func newAuthAPI(store *Store, secret string, ttl time.Duration) *authAPI {
-	return &authAPI{store: store, jwtSecret: []byte(secret), tokenTTL: ttl}
+	return &authAPI{store: store, jwtSecret: []byte(secret), tokenTTL: ttl, limiter: newLoginLimiter()}
 }
 
 func (a *authAPI) signToken(userID, username string, moduleCodes []string) (string, error) {
@@ -107,6 +110,9 @@ func (a *authAPI) authUser(userID string) (*AuthUser, error) {
 
 // login verifies credentials and, on success, sets the session cookie and
 // returns the authenticated user + the modules they can access.
+//
+// Failed attempts are rate-limited per username+IP (see ratelimit.go) and
+// every attempt - success or failure - is written to the audit log.
 func (a *authAPI) login(w http.ResponseWriter, r *http.Request) {
 	var in loginRequest
 	if err := decodeJSON(r, &in); err != nil {
@@ -114,9 +120,25 @@ func (a *authAPI) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ip := clientIP(r)
+	limitKey := in.Username + "|" + ip
+
+	if blocked, retryAfter := a.limiter.blocked(limitKey); blocked {
+		minutes := int(retryAfter.Minutes()) + 1
+		a.audit("auth.login_blocked", "user", "", in.Username, ip)
+		writeErr(w, http.StatusTooManyRequests, fmt.Sprintf("too many failed attempts, try again in %d minute(s)", minutes))
+		return
+	}
+
+	fail := func(msg string) {
+		a.limiter.recordFailure(limitKey)
+		a.audit("auth.login_failed", "user", "", in.Username, ip)
+		writeErr(w, http.StatusUnauthorized, msg)
+	}
+
 	user, passwordHash, err := a.store.GetUserByUsername(in.Username)
 	if errors.Is(err, sql.ErrNoRows) || errors.Is(err, ErrNotFound) {
-		writeErr(w, http.StatusUnauthorized, "invalid username or password")
+		fail("invalid username or password")
 		return
 	}
 	if err != nil {
@@ -124,11 +146,11 @@ func (a *authAPI) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !user.IsActive {
-		writeErr(w, http.StatusUnauthorized, "account is disabled")
+		fail("account is disabled")
 		return
 	}
 	if passwordHash == "" || !checkPassword(passwordHash, in.Password) {
-		writeErr(w, http.StatusUnauthorized, "invalid username or password")
+		fail("invalid username or password")
 		return
 	}
 
@@ -147,8 +169,28 @@ func (a *authAPI) login(w http.ResponseWriter, r *http.Request) {
 		handleErr(w, err)
 		return
 	}
+	a.limiter.recordSuccess(limitKey)
 	a.setSessionCookie(w, token)
+	a.audit("auth.login", "user", user.ID, user.Username, ip)
 	writeJSON(w, http.StatusOK, &AuthUser{ID: user.ID, Username: user.Username, FullName: user.FullName, Email: user.Email, Modules: modules})
+}
+
+// audit is a small helper for the auth endpoints, which run outside
+// nginx's auth_request gate (see nginx.conf) and so don't have
+// X-User-Id/X-Username headers to read like writeAudit (handlers.go) does.
+func (a *authAPI) audit(action, entityType, entityID, username, ip string) {
+	e := &AuditEntry{
+		ActorUserID:   entityID,
+		ActorUsername: username,
+		ModuleCode:    "app-maintenance",
+		Action:        action,
+		EntityType:    entityType,
+		EntityID:      entityID,
+		IPAddress:     ip,
+	}
+	if err := a.store.InsertAuditLog(e); err != nil {
+		log.Printf("audit log write failed: %v", err)
+	}
 }
 
 func (a *authAPI) logout(w http.ResponseWriter, r *http.Request) {
