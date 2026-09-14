@@ -12,13 +12,15 @@ import { cn } from '../lib/utils.js'
 export default function Users() {
   const [users, setUsers] = useState([])
   const [roles, setRoles] = useState([])
+  const [modules, setModules] = useState([])
   const [error, setError] = useState('')
   const [form, setForm] = useState({ username: '', fullName: '', email: '', password: '' })
   const [panel, setPanel] = useState(null) // { userId, mode: 'roles' | 'password' }
+  const [assignModuleId, setAssignModuleId] = useState('')
   const [passwordInput, setPasswordInput] = useState('')
 
-  const load = () => Promise.all([api.listUsers(), api.listRoles()])
-    .then(([u, r]) => { setUsers(u); setRoles(r) })
+  const load = () => Promise.all([api.listUsers(), api.listRoles(), api.listModules()])
+    .then(([u, r, m]) => { setUsers(u); setRoles(r); setModules(m) })
     .catch((e) => setError(e.message))
 
   useEffect(() => { load() }, [])
@@ -60,7 +62,14 @@ export default function Users() {
     }
   }
 
+  const openAssign = (userId) => {
+    setPanel({ userId, mode: 'roles' })
+    setAssignModuleId((prev) => prev || modules[0]?.id || '')
+  }
+
   const roleName = (id) => roles.find((r) => r.id === id)?.name || id
+  const moduleName = (id) => modules.find((m) => m.id === id)?.name || id
+  const rolesForModule = (moduleId) => roles.filter((r) => r.moduleId === moduleId)
 
   return (
     <div className="flex flex-col gap-6">
@@ -121,6 +130,7 @@ export default function Users() {
               {users.map((u) => {
                 const isRolesOpen = panel?.userId === u.id && panel.mode === 'roles'
                 const isPasswordOpen = panel?.userId === u.id && panel.mode === 'password'
+                const roleIdsInModule = rolesForModule(assignModuleId).map((r) => r.id)
                 return (
                   <tr key={u.id} className="border-b last:border-0 align-top hover:bg-muted/40">
                     <td className="px-4 py-3 font-medium">{u.username}</td>
@@ -128,30 +138,57 @@ export default function Users() {
                     <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
-                        {u.roleIds.map((id) => <Badge key={id} variant="secondary">{roleName(id)}</Badge>)}
+                        {u.roleIds.map((id) => (
+                          <Badge key={id} variant="secondary" title={moduleName(roles.find((r) => r.id === id)?.moduleId)}>
+                            {roleName(id)}
+                          </Badge>
+                        ))}
+                        {u.roleIds.length === 0 && <span className="text-xs text-muted-foreground">No roles</span>}
                       </div>
+
                       {isRolesOpen && (
-                        <div className="mt-2 flex flex-wrap gap-2 rounded-md border bg-muted/30 p-2">
-                          {roles.map((r) => {
-                            const selected = u.roleIds.includes(r.id)
-                            return (
-                              <button
-                                key={r.id}
-                                type="button"
-                                onClick={() => toggleRole(u, r.id)}
-                                className={cn(
-                                  'rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors',
-                                  selected
-                                    ? 'border-primary bg-primary text-primary-foreground'
-                                    : 'border-input bg-background hover:bg-accent'
-                                )}
-                              >
-                                {r.name}
-                              </button>
-                            )
-                          })}
+                        <div className="mt-2 flex flex-col gap-2 rounded-md border bg-muted/30 p-2.5">
+                          <div className="grid gap-1">
+                            <Label htmlFor="assign-module" className="text-xs text-muted-foreground">1. Pick a module</Label>
+                            <select
+                              id="assign-module"
+                              value={assignModuleId}
+                              onChange={(e) => setAssignModuleId(e.target.value)}
+                              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                            >
+                              {modules.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                            </select>
+                          </div>
+                          <div className="grid gap-1">
+                            <span className="text-xs text-muted-foreground">2. Toggle role(s) in this module</span>
+                            <div className="flex flex-wrap gap-2">
+                              {roleIdsInModule.length === 0 && (
+                                <span className="text-xs text-muted-foreground">No roles defined for this module yet.</span>
+                              )}
+                              {rolesForModule(assignModuleId).map((r) => {
+                                const selected = u.roleIds.includes(r.id)
+                                return (
+                                  <button
+                                    key={r.id}
+                                    type="button"
+                                    onClick={() => toggleRole(u, r.id)}
+                                    className={cn(
+                                      'rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors',
+                                      selected
+                                        ? 'border-primary bg-primary text-primary-foreground'
+                                        : 'border-input bg-background hover:bg-accent'
+                                    )}
+                                  >
+                                    {r.name}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                            <span className="text-[11px] text-muted-foreground">A user can hold more than one role within the same module.</span>
+                          </div>
                         </div>
                       )}
+
                       {isPasswordOpen && (
                         <div className="mt-2 flex items-center gap-2">
                           <Input
@@ -172,7 +209,7 @@ export default function Users() {
                         <Button
                           variant="ghost" size="icon"
                           title="Assign roles"
-                          onClick={() => setPanel(isRolesOpen ? null : { userId: u.id, mode: 'roles' })}
+                          onClick={() => (isRolesOpen ? setPanel(null) : openAssign(u.id))}
                         >
                           <ShieldCheck className="h-4 w-4" />
                         </Button>

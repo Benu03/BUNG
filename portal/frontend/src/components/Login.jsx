@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { Boxes, LoaderCircle, TriangleAlert } from 'lucide-react'
+import { LoaderCircle, TriangleAlert } from 'lucide-react'
 import { Button } from './ui/button.jsx'
 import { Input } from './ui/input.jsx'
 import { Label } from './ui/label.jsx'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './ui/card.jsx'
 import { Alert, AlertDescription } from './ui/alert.jsx'
+import Logo from './Logo.jsx'
+import ThemeToggle from './ThemeToggle.jsx'
 
 export default function Login({ onLoggedIn, notice, settings }) {
   const [username, setUsername] = useState('')
@@ -36,15 +38,15 @@ export default function Login({ onLoggedIn, notice, settings }) {
     <div className="relative flex min-h-svh items-center justify-center overflow-hidden bg-background px-4">
       {/* soft ambient glow, brand-colored */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 left-1/2 h-96 w-[36rem] -translate-x-1/2 rounded-full bg-primary/25 blur-3xl" />
-        <div className="absolute -bottom-40 right-1/4 h-72 w-72 rounded-full bg-primary-dark/20 blur-3xl" />
+        <div className="absolute -top-40 left-1/2 h-96 w-[36rem] -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
+        <div className="absolute -bottom-40 right-1/4 h-72 w-72 rounded-full bg-primary-dark/15 blur-3xl" />
       </div>
+
+      <ThemeToggle className="absolute right-4 top-4 z-10 text-muted-foreground" />
 
       <div className="relative z-10 w-full max-w-sm">
         <div className="mb-7 flex flex-col items-center gap-3 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary-dark text-primary-foreground shadow-lg shadow-primary/30">
-            <Boxes className="h-6 w-6" />
-          </div>
+          <Logo className="h-12 w-12 shadow-lg shadow-primary/30" />
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">{settings.siteName}</h1>
             <p className="text-sm text-muted-foreground">{settings.tagline}</p>

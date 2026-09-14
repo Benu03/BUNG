@@ -4,14 +4,15 @@ import "time"
 
 // User represents an application user.
 type User struct {
-	ID        string    `json:"id"`
-	Username  string    `json:"username"`
-	FullName  string    `json:"fullName"`
-	Email     string    `json:"email"`
-	IsActive  bool      `json:"isActive"`
-	RoleIDs   []string  `json:"roleIds"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID                string    `json:"id"`
+	Username          string    `json:"username"`
+	FullName          string    `json:"fullName"`
+	Email             string    `json:"email"`
+	IsActive          bool      `json:"isActive"`
+	RoleIDs           []string  `json:"roleIds"`
+	PasswordChangedAt time.Time `json:"passwordChangedAt"`
+	CreatedAt         time.Time `json:"createdAt"`
+	UpdatedAt         time.Time `json:"updatedAt"`
 }
 
 // Module represents a registered application module (e.g. hr, finance,
@@ -26,12 +27,15 @@ type Module struct {
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
-// Role groups a set of module permissions and is assigned to users.
+// Role belongs to exactly one module and is assigned to users. A user can
+// hold several roles within the same module (e.g. "Editor" + "Approver"
+// both in Kanban) - that's just two rows in user_roles pointing at two
+// roles that share a module_id, nothing special needed in this struct.
 type Role struct {
 	ID          string    `json:"id"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
-	ModuleIDs   []string  `json:"moduleIds"` // modules this role can access
+	ModuleID    string    `json:"moduleId"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
@@ -53,20 +57,46 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
-// AuthUser is what login/me hand back to the frontend: the user plus the
-// modules their roles grant access to (what the portal renders).
-type AuthUser struct {
-	ID       string    `json:"id"`
-	Username string    `json:"username"`
-	FullName string    `json:"fullName"`
-	Email    string    `json:"email"`
-	Modules  []*Module `json:"modules"`
+// changePasswordRequest is the payload for POST /auth/change-password -
+// self-service, requires the current password (unlike the admin-only
+// "Set Password" action in the Users tab, which doesn't).
+type changePasswordRequest struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
 }
 
-// SiteSettings controls content shown on the portal's public landing page.
+// forgotPasswordRequest is the payload for POST /auth/forgot-password.
+// Identifier can be a username or an email.
+type forgotPasswordRequest struct {
+	Identifier string `json:"identifier"`
+}
+
+// resetPasswordRequest is the payload for POST /auth/reset-password.
+type resetPasswordRequest struct {
+	Token       string `json:"token"`
+	NewPassword string `json:"newPassword"`
+}
+
+// AuthUser is what login/me hand back to the frontend: the user plus the
+// modules their roles grant access to (what the portal renders), and
+// whether their password has aged past site_settings.password_expiry_days
+// (the portal blocks access to everything but App Maintenance until
+// they change it - see verify() in auth.go).
+type AuthUser struct {
+	ID                 string    `json:"id"`
+	Username           string    `json:"username"`
+	FullName           string    `json:"fullName"`
+	Email              string    `json:"email"`
+	Modules            []*Module `json:"modules"`
+	MustChangePassword bool      `json:"mustChangePassword"`
+}
+
+// SiteSettings is the platform's general settings: content shown on the
+// portal's public landing page, and platform-wide policy.
 type SiteSettings struct {
-	SiteName     string    `json:"siteName"`
-	Tagline      string    `json:"tagline"`
-	Announcement string    `json:"announcement"`
-	UpdatedAt    time.Time `json:"updatedAt"`
+	SiteName           string    `json:"siteName"`
+	Tagline            string    `json:"tagline"`
+	Announcement       string    `json:"announcement"`
+	PasswordExpiryDays int       `json:"passwordExpiryDays"`
+	UpdatedAt          time.Time `json:"updatedAt"`
 }

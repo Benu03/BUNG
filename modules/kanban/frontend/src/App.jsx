@@ -1,11 +1,17 @@
-import { useState } from 'react'
-import { ArrowLeft, Boxes, LogOut, LayoutGrid } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowLeft, LogOut, LayoutGrid } from 'lucide-react'
 import BoardList from './components/BoardList.jsx'
 import Board from './components/Board.jsx'
+import Logo from './components/Logo.jsx'
+import ThemeToggle from './components/ThemeToggle.jsx'
 import { Button } from './components/ui/button.jsx'
+import { api } from './api.js'
 
 export default function App() {
   const [boardId, setBoardId] = useState(null)
+  const [me, setMe] = useState(null)
+
+  useEffect(() => { api.me().then(setMe).catch(() => {}) }, [])
 
   // Auth (login/logout/session) is owned entirely by app-maintenance (see
   // /nginx/auth-common.conf) - this module never implements its own.
@@ -19,9 +25,7 @@ export default function App() {
       <header className="sticky top-0 z-10 bg-gradient-to-r from-primary to-primary-dark text-primary-foreground shadow-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15">
-              <Boxes className="h-4 w-4" />
-            </div>
+            <Logo className="h-8 w-8" />
             <div>
               <div className="flex items-center gap-1.5 text-sm font-semibold leading-none">
                 <LayoutGrid className="h-3.5 w-3.5" />
@@ -31,6 +35,7 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <ThemeToggle className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <Button size="sm" asChild className="border border-white/25 bg-white/10 text-primary-foreground shadow-none hover:bg-white/20">
               <a href="/">
                 <ArrowLeft />
@@ -47,7 +52,7 @@ export default function App() {
 
       <main className="mx-auto max-w-6xl px-4 py-8">
         {boardId
-          ? <Board boardId={boardId} onBack={() => setBoardId(null)} />
+          ? <Board boardId={boardId} onBack={() => setBoardId(null)} me={me} />
           : <BoardList onOpen={setBoardId} />}
       </main>
     </div>

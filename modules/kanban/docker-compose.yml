@@ -25,4 +25,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      # Kanban reads app_maintenance.users directly (cross-schema, see
+      # store.go's ListAllUsers) and seeds its starter board owned by the
+      # admin user - starting after app-maintenance reduces, though doesn't
+      # fully eliminate, the race on a very first `docker compose up`.
+      app-maintenance-backend:
+        condition: service_started
     restart: unless-stopped

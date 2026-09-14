@@ -23,26 +23,29 @@ CREATE TABLE IF NOT EXISTS modules (
 	updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Each role belongs to exactly one module (not a many-to-many like an
+-- earlier version of this schema had via a role_modules table) - so
+-- assigning a user a role is inherently "grant them this role IN this
+-- module", and a user can hold several roles within the same module (see
+-- user_roles below - nothing module-specific needed there, since each
+-- role_id already implies a single module_id).
 CREATE TABLE IF NOT EXISTS roles (
 	id UUID PRIMARY KEY DEFAULT public.gen_random_uuid(),
-	name TEXT UNIQUE NOT NULL,
+	module_id UUID NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
+	name TEXT NOT NULL,
 	description TEXT NOT NULL DEFAULT '',
 	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-	updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS role_modules (
-	role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-	module_id UUID NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
-	PRIMARY KEY (role_id, module_id)
+	updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	UNIQUE (module_id, name)
 );
 
 CREATE TABLE IF NOT EXISTS users (
 	id UUID PRIMARY KEY DEFAULT public.gen_random_uuid(),
 	username TEXT UNIQUE NOT NULL,
 	full_name TEXT NOT NULL DEFAULT '',
-	email TEXT NOT NULL DEFAULT '',
+	email TEXT UNIQUE NOT NULL DEFAULT '',
 	password_hash TEXT NOT NULL DEFAULT '',
+	password_changed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 	is_active BOOLEAN NOT NULL DEFAULT true,
 	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 	updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -54,16 +57,31 @@ CREATE TABLE IF NOT EXISTS user_roles (
 	PRIMARY KEY (user_id, role_id)
 );
 
--- Single-row config table for content shown on the portal's public landing
--- page (site name, tagline, an optional announcement banner). Managed from
--- the Settings tab.
+-- Single-row general settings: content shown on the portal's public landing
+-- page (site name, tagline, announcement) plus platform-wide policy
+-- (password_expiry_days). Managed from the Settings tab.
 CREATE TABLE IF NOT EXISTS site_settings (
 	id TEXT PRIMARY KEY DEFAULT 'default',
 	site_name TEXT NOT NULL DEFAULT 'BUNG',
 	tagline TEXT NOT NULL DEFAULT '',
 	announcement TEXT NOT NULL DEFAULT '',
+	password_expiry_days INT NOT NULL DEFAULT 60, -- 0 = never expire
 	updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Forgot-password tokens. Only a hash of the token is stored (same
+-- reasoning as password_hash) - a DB leak alone can't be used to reset
+-- anyone's password. One-time use (used_at) and short-lived (expires_at).
+CREATE TABLE IF NOT EXISTS password_resets (
+	id UUID PRIMARY KEY DEFAULT public.gen_random_uuid(),
+	user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	token_hash TEXT NOT NULL,
+	expires_at TIMESTAMPTZ NOT NULL,
+	used_at TIMESTAMPTZ,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS password_resets_token_hash_idx ON password_resets (token_hash);
 `
 
 // alterSQL patches tables that already existed from an earlier version of
@@ -73,6 +91,9 @@ CREATE TABLE IF NOT EXISTS site_settings (
 // done - no separate migration tool/runner needed for changes this simple.
 const alterSQL = `
 ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ NOT NULL DEFAULT now();
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_idx ON users (email);
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS password_expiry_days INT NOT NULL DEFAULT 60;
 `
 
 // auditSchemaSQL creates the shared, cross-module audit trail. It lives in
@@ -142,40 +163,36 @@ func seed(db *sql.DB) error {
 		return nil
 	}
 
-	var roleID, userID string
+	var userID string
 
-	// Seed one registry row per module that ships with this stack. This is
-	// what drives the portal landing page's module list - when you add a
-	// new module folder, also add it here (or via the Modules tab in the
-	// UI) so it shows up on the portal without a manual step.
+	// Seed one registry row per module that ships with this stack (drives
+	// the portal's module list), plus one "Administrator" role scoped to
+	// each - when you add a new module folder, add it here too (or via the
+	// Modules + Roles tabs) so it shows up on the portal and has a role to
+	// assign.
 	knownModules := []struct{ code, name, description string }{
 		{"app-maintenance", "App Maintenance", "User, module and role administration"},
 		{"kanban", "Kanban", "Boards, columns and cards"},
 	}
 
-	moduleIDs := make([]string, 0, len(knownModules))
+	adminRoleIDs := make([]string, 0, len(knownModules))
 	for _, m := range knownModules {
-		var id string
+		var moduleID string
 		if err := db.QueryRow(
 			`INSERT INTO modules (code, name, description) VALUES ($1, $2, $3) RETURNING id`,
 			m.code, m.name, m.description,
-		).Scan(&id); err != nil {
+		).Scan(&moduleID); err != nil {
 			return fmt.Errorf("seed module %s: %w", m.code, err)
 		}
-		moduleIDs = append(moduleIDs, id)
-	}
 
-	if err := db.QueryRow(
-		`INSERT INTO roles (name, description) VALUES ($1, $2) RETURNING id`,
-		"Administrator", "Full access to all modules",
-	).Scan(&roleID); err != nil {
-		return fmt.Errorf("seed role: %w", err)
-	}
-
-	for _, moduleID := range moduleIDs {
-		if _, err := db.Exec(`INSERT INTO role_modules (role_id, module_id) VALUES ($1, $2)`, roleID, moduleID); err != nil {
-			return fmt.Errorf("seed role_modules: %w", err)
+		var roleID string
+		if err := db.QueryRow(
+			`INSERT INTO roles (module_id, name, description) VALUES ($1, $2, $3) RETURNING id`,
+			moduleID, "Administrator", "Full access to this module",
+		).Scan(&roleID); err != nil {
+			return fmt.Errorf("seed role for %s: %w", m.code, err)
 		}
+		adminRoleIDs = append(adminRoleIDs, roleID)
 	}
 
 	// Default admin password comes from env (see .env's SEED_ADMIN_PASSWORD)
@@ -193,10 +210,12 @@ func seed(db *sql.DB) error {
 		return fmt.Errorf("seed user: %w", err)
 	}
 
-	if _, err := db.Exec(`INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)`, userID, roleID); err != nil {
-		return fmt.Errorf("seed user_roles: %w", err)
+	for _, roleID := range adminRoleIDs {
+		if _, err := db.Exec(`INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)`, userID, roleID); err != nil {
+			return fmt.Errorf("seed user_roles: %w", err)
+		}
 	}
 
-	log.Println("seeded initial admin user/role/module")
+	log.Println("seeded initial admin user with Administrator role in every module")
 	return nil
 }

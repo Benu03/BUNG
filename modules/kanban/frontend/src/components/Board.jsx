@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Users } from 'lucide-react'
 import { api } from '../api.js'
 import { Button } from './ui/button.jsx'
 import { Input } from './ui/input.jsx'
 import { Card } from './ui/card.jsx'
+import MembersPanel from './Members.jsx'
 
 function CardItem({ card, columns, onChanged }) {
   const [title, setTitle] = useState(card.title)
@@ -124,10 +125,11 @@ function ColumnLane({ column, columns, onChanged }) {
   )
 }
 
-export default function Board({ boardId, onBack }) {
+export default function Board({ boardId, onBack, me }) {
   const [board, setBoard] = useState(null)
   const [error, setError] = useState('')
   const [newColumnName, setNewColumnName] = useState('')
+  const [showMembers, setShowMembers] = useState(false)
 
   const load = () => api.getBoard(boardId).then(setBoard).catch((e) => setError(e.message))
 
@@ -141,8 +143,16 @@ export default function Board({ boardId, onBack }) {
     load()
   }
 
+  const deleteBoard = async () => {
+    if (!confirm('Delete this board and everything in it?')) return
+    await api.deleteBoard(boardId)
+    onBack()
+  }
+
   if (error) return <Card className="p-4 text-sm text-destructive">{error}</Card>
   if (!board) return <div className="text-sm text-muted-foreground">Loading...</div>
+
+  const isOwner = me && board.ownerId === me.id
 
   return (
     <div>
@@ -151,8 +161,22 @@ export default function Board({ boardId, onBack }) {
           <ArrowLeft />
           Boards
         </Button>
-        <h2 className="text-lg font-semibold tracking-tight">{board.name}</h2>
+        <h2 className="flex-1 text-lg font-semibold tracking-tight">{board.name}</h2>
+        <Button variant="outline" size="sm" onClick={() => setShowMembers(true)}>
+          <Users />
+          Members
+        </Button>
+        {isOwner && (
+          <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={deleteBoard}>
+            <Trash2 />
+            Delete board
+          </Button>
+        )}
       </div>
+
+      {showMembers && (
+        <MembersPanel board={board} isOwner={isOwner} onClose={() => setShowMembers(false)} />
+      )}
 
       <div className="flex gap-4 overflow-x-auto pb-4">
         {board.columns.map((col) => (

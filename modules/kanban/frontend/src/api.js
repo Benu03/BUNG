@@ -17,6 +17,8 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  me: () => request('me'),
+
   listBoards: () => request('boards'),
   getBoard: (id) => request(`boards/${id}`),
   createBoard: (data) => request('boards', { method: 'POST', body: JSON.stringify(data) }),
@@ -31,4 +33,9 @@ export const api = {
   updateCard: (id, data) => request(`cards/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   moveCard: (id, columnId, position) => request(`cards/${id}/move`, { method: 'PUT', body: JSON.stringify({ columnId, position }) }),
   deleteCard: (id) => request(`cards/${id}`, { method: 'DELETE' }),
+
+  listMembers: (boardId) => request(`boards/${boardId}/members`),
+  addMember: (boardId, username) => request(`boards/${boardId}/members`, { method: 'POST', body: JSON.stringify({ username }) }),
+  removeMember: (boardId, userId) => request(`boards/${boardId}/members/${userId}`, { method: 'DELETE' }),
+  listUsers: () => request('users'),
 }

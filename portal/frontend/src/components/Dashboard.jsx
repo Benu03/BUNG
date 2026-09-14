@@ -1,7 +1,9 @@
-import { ArrowRight, Boxes, LogOut, Megaphone, PackageOpen } from 'lucide-react'
+import { ArrowRight, LogOut, Megaphone, PackageOpen } from 'lucide-react'
 import { Button } from './ui/button.jsx'
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from './ui/card.jsx'
 import { Alert, AlertDescription } from './ui/alert.jsx'
+import Logo from './Logo.jsx'
+import ThemeToggle from './ThemeToggle.jsx'
 
 const ICON_GRADIENTS = [
   'from-violet-500 to-fuchsia-500',
@@ -29,13 +31,12 @@ export default function Dashboard({ user, onLogout, settings }) {
       <header className="sticky top-0 z-10 bg-gradient-to-r from-primary to-primary-dark text-primary-foreground shadow-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3.5">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15">
-              <Boxes className="h-4 w-4" />
-            </div>
+            <Logo className="h-8 w-8" />
             <span className="font-semibold tracking-tight">{settings.siteName}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-primary-foreground/80">{user.fullName || user.username}</span>
+          <div className="flex items-center gap-2">
+            <span className="mr-1 text-sm text-primary-foreground/80">{user.fullName || user.username}</span>
+            <ThemeToggle className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <Button
               size="sm"
               onClick={onLogout}

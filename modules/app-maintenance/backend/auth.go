@@ -15,11 +15,12 @@ import (
 const sessionCookieName = "bung_session"
 
 // claims is what gets signed into the session JWT. ModuleCodes is baked in
-// at login time (a join over roles -> role_modules -> modules), so nginx's
-// auth_request check and every module's authorization decision is a pure
-// in-memory check against the token - no database round trip on every
-// request. The trade-off: a role/module change only takes effect for a
-// user the next time they log in (or the token expires).
+// at login time (a join over roles -> modules, since each role belongs to
+// exactly one module), so nginx's auth_request check and every module's
+// authorization decision is a pure in-memory check against the token - no
+// database round trip on every request. The trade-off: a role/module
+// change only takes effect for a user the next time they log in (or the
+// token expires).
 type claims struct {
 	Username    string   `json:"username"`
 	ModuleCodes []string `json:"moduleCodes"`

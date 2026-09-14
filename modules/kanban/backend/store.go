@@ -5,9 +5,17 @@ import (
 	"errors"
 )
 
-// ErrNotFound is returned by Store methods when the requested row doesn't
-// exist, so handlers can tell that apart from a real (5xx) failure.
+// ErrNotFound is returned when the requested row doesn't exist, or - for
+// boards - when it exists but the caller isn't a member (boards are
+// private, see board_members; we don't distinguish "doesn't exist" from
+// "not yours" in the response, same reasoning as a 404 instead of a 403
+// for a resource you shouldn't know exists).
 var ErrNotFound = errors.New("not found")
+
+// ErrForbidden is for actions that require a stronger relationship than
+// plain membership (e.g. only the owner can delete a board or manage its
+// members).
+var ErrForbidden = errors.New("forbidden")
 
 // Store is backed by Postgres, scoped to this module's schema via the
 // connection's search_path (see db.go).
@@ -19,19 +27,73 @@ func NewStore(db *sql.DB) *Store {
 	return &Store{db: db}
 }
 
+// ---- membership ----
+
+func (s *Store) memberRole(boardID, userID string) (string, error) {
+	var role string
+	err := s.db.QueryRow(`SELECT role FROM board_members WHERE board_id = $1 AND user_id = $2`, boardID, userID).Scan(&role)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	return role, err
+}
+
+func (s *Store) requireMember(boardID, userID string) error {
+	_, err := s.memberRole(boardID, userID)
+	return err
+}
+
+func (s *Store) requireOwner(boardID, userID string) error {
+	role, err := s.memberRole(boardID, userID)
+	if err != nil {
+		return err
+	}
+	if role != "owner" {
+		return ErrForbidden
+	}
+	return nil
+}
+
+// boardIDForColumn/boardIDForCard resolve the board a column/card belongs
+// to, so mutation endpoints can check membership even though the request
+// only carries a column/card id.
+func (s *Store) boardIDForColumn(columnID string) (string, error) {
+	var boardID string
+	err := s.db.QueryRow(`SELECT board_id FROM columns WHERE id = $1`, columnID).Scan(&boardID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	return boardID, err
+}
+
+func (s *Store) boardIDForCard(cardID string) (string, error) {
+	var boardID string
+	err := s.db.QueryRow(`
+		SELECT c.board_id FROM cards ca JOIN columns c ON c.id = ca.column_id WHERE ca.id = $1`, cardID).Scan(&boardID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	return boardID, err
+}
+
 // ---- boards ----
 
-func (s *Store) ListBoards() ([]*Board, error) {
-	rows, err := s.db.Query(`SELECT id, name, description, created_at, updated_at FROM boards ORDER BY created_at`)
+func (s *Store) ListBoards(userID string) ([]*Board, error) {
+	rows, err := s.db.Query(`
+		SELECT b.id, b.owner_id, b.name, b.description, b.created_at, b.updated_at
+		FROM boards b
+		JOIN board_members bm ON bm.board_id = b.id
+		WHERE bm.user_id = $1
+		ORDER BY b.created_at`, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var boards []*Board
+	boards := []*Board{}
 	for rows.Next() {
 		var b Board
-		if err := rows.Scan(&b.ID, &b.Name, &b.Description, &b.CreatedAt, &b.UpdatedAt); err != nil {
+		if err := rows.Scan(&b.ID, &b.OwnerID, &b.Name, &b.Description, &b.CreatedAt, &b.UpdatedAt); err != nil {
 			return nil, err
 		}
 		boards = append(boards, &b)
@@ -39,31 +101,57 @@ func (s *Store) ListBoards() ([]*Board, error) {
 	return boards, rows.Err()
 }
 
-func (s *Store) GetBoard(id string) (*Board, error) {
+func (s *Store) getBoard(id string) (*Board, error) {
 	var b Board
-	err := s.db.QueryRow(`SELECT id, name, description, created_at, updated_at FROM boards WHERE id = $1`, id).
-		Scan(&b.ID, &b.Name, &b.Description, &b.CreatedAt, &b.UpdatedAt)
+	err := s.db.QueryRow(`SELECT id, owner_id, name, description, created_at, updated_at FROM boards WHERE id = $1`, id).
+		Scan(&b.ID, &b.OwnerID, &b.Name, &b.Description, &b.CreatedAt, &b.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
+	return &b, err
+}
+
+// CreateBoardWithColumns creates a board, makes the creator its owner, and
+// creates the given initial columns (the workflow) in one go.
+func (s *Store) CreateBoardWithColumns(userID, name, description string, columnNames []string) (*Board, error) {
+	tx, err := s.db.Begin()
 	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var b Board
+	b.OwnerID = userID
+	if err := tx.QueryRow(
+		`INSERT INTO boards (owner_id, name, description) VALUES ($1, $2, $3) RETURNING id, name, description, created_at, updated_at`,
+		userID, name, description,
+	).Scan(&b.ID, &b.Name, &b.Description, &b.CreatedAt, &b.UpdatedAt); err != nil {
+		return nil, err
+	}
+
+	if _, err := tx.Exec(`INSERT INTO board_members (board_id, user_id, role) VALUES ($1, $2, 'owner')`, b.ID, userID); err != nil {
+		return nil, err
+	}
+
+	for i, name := range columnNames {
+		if name == "" {
+			continue
+		}
+		if _, err := tx.Exec(`INSERT INTO columns (board_id, name, position) VALUES ($1, $2, $3)`, b.ID, name, i); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return &b, nil
 }
 
-func (s *Store) CreateBoard(in *Board) (*Board, error) {
-	err := s.db.QueryRow(
-		`INSERT INTO boards (name, description) VALUES ($1, $2) RETURNING id, created_at, updated_at`,
-		in.Name, in.Description,
-	).Scan(&in.ID, &in.CreatedAt, &in.UpdatedAt)
-	if err != nil {
+func (s *Store) UpdateBoard(userID, id string, in *Board) (*Board, error) {
+	if err := s.requireMember(id, userID); err != nil {
 		return nil, err
 	}
-	return in, nil
-}
-
-func (s *Store) UpdateBoard(id string, in *Board) (*Board, error) {
 	res, err := s.db.Exec(
 		`UPDATE boards SET name = $1, description = $2, updated_at = now() WHERE id = $3`,
 		in.Name, in.Description, id,
@@ -74,24 +162,26 @@ func (s *Store) UpdateBoard(id string, in *Board) (*Board, error) {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return nil, ErrNotFound
 	}
-	return s.GetBoard(id)
+	return s.getBoard(id)
 }
 
-func (s *Store) DeleteBoard(id string) error {
-	res, err := s.db.Exec(`DELETE FROM boards WHERE id = $1`, id)
-	if err != nil {
+// DeleteBoard is owner-only.
+func (s *Store) DeleteBoard(userID, id string) error {
+	if err := s.requireOwner(id, userID); err != nil {
 		return err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
-	}
-	return nil
+	_, err := s.db.Exec(`DELETE FROM boards WHERE id = $1`, id)
+	return err
 }
 
 // GetBoardFull returns a board together with all of its columns and each
 // column's cards, so the frontend can render the whole board in one call.
-func (s *Store) GetBoardFull(id string) (*BoardFull, error) {
-	board, err := s.GetBoard(id)
+// Returns ErrNotFound if userID isn't a member.
+func (s *Store) GetBoardFull(userID, id string) (*BoardFull, error) {
+	if err := s.requireMember(id, userID); err != nil {
+		return nil, err
+	}
+	board, err := s.getBoard(id)
 	if err != nil {
 		return nil, err
 	}
@@ -125,9 +215,107 @@ func (s *Store) GetBoardFull(id string) (*BoardFull, error) {
 	return full, nil
 }
 
+// ---- members ----
+
+func (s *Store) ListMembers(boardID string) ([]*BoardMember, error) {
+	rows, err := s.db.Query(`
+		SELECT bm.user_id, u.username, u.full_name, bm.role, bm.joined_at
+		FROM board_members bm
+		JOIN app_maintenance.users u ON u.id = bm.user_id
+		WHERE bm.board_id = $1
+		ORDER BY bm.joined_at`, boardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	members := []*BoardMember{}
+	for rows.Next() {
+		var m BoardMember
+		if err := rows.Scan(&m.UserID, &m.Username, &m.FullName, &m.Role, &m.JoinedAt); err != nil {
+			return nil, err
+		}
+		members = append(members, &m)
+	}
+	return members, rows.Err()
+}
+
+// AddMember is owner-only; looks the invitee up by username in
+// app-maintenance's user directory (cross-schema read).
+func (s *Store) AddMember(actorUserID, boardID, username string) (*BoardMember, error) {
+	if err := s.requireOwner(boardID, actorUserID); err != nil {
+		return nil, err
+	}
+
+	var m BoardMember
+	err := s.db.QueryRow(`SELECT id, username, full_name FROM app_maintenance.users WHERE username = $1`, username).
+		Scan(&m.UserID, &m.Username, &m.FullName)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	m.Role = "member"
+	if _, err := s.db.Exec(
+		`INSERT INTO board_members (board_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING`,
+		boardID, m.UserID,
+	); err != nil {
+		return nil, err
+	}
+	if err := s.db.QueryRow(`SELECT joined_at FROM board_members WHERE board_id = $1 AND user_id = $2`, boardID, m.UserID).Scan(&m.JoinedAt); err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// RemoveMember is owner-only; an owner can't remove themself (transfer
+// ownership isn't implemented yet - delete the board instead).
+func (s *Store) RemoveMember(actorUserID, boardID, targetUserID string) error {
+	if err := s.requireOwner(boardID, actorUserID); err != nil {
+		return err
+	}
+	if targetUserID == actorUserID {
+		return ErrForbidden
+	}
+	res, err := s.db.Exec(`DELETE FROM board_members WHERE board_id = $1 AND user_id = $2`, boardID, targetUserID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ListAllUsers is a cross-schema read of app-maintenance's user directory,
+// used to populate the "add member" search. Read-only, no FK - see the
+// comment on board_members in migrate.go.
+func (s *Store) ListAllUsers() ([]*UserRef, error) {
+	rows, err := s.db.Query(`SELECT id, username, full_name FROM app_maintenance.users ORDER BY username`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := []*UserRef{}
+	for rows.Next() {
+		var u UserRef
+		if err := rows.Scan(&u.ID, &u.Username, &u.FullName); err != nil {
+			return nil, err
+		}
+		users = append(users, &u)
+	}
+	return users, rows.Err()
+}
+
 // ---- columns ----
 
-func (s *Store) CreateColumn(in *Column) (*Column, error) {
+func (s *Store) CreateColumn(userID string, in *Column) (*Column, error) {
+	if err := s.requireMember(in.BoardID, userID); err != nil {
+		return nil, err
+	}
 	err := s.db.QueryRow(
 		`INSERT INTO columns (board_id, name, position) VALUES ($1, $2, $3) RETURNING id, created_at, updated_at`,
 		in.BoardID, in.Name, in.Position,
@@ -138,7 +326,14 @@ func (s *Store) CreateColumn(in *Column) (*Column, error) {
 	return in, nil
 }
 
-func (s *Store) UpdateColumn(id string, in *Column) (*Column, error) {
+func (s *Store) UpdateColumn(userID, id string, in *Column) (*Column, error) {
+	boardID, err := s.boardIDForColumn(id)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.requireMember(boardID, userID); err != nil {
+		return nil, err
+	}
 	res, err := s.db.Exec(
 		`UPDATE columns SET name = $1, position = $2, updated_at = now() WHERE id = $3`,
 		in.Name, in.Position, id,
@@ -158,7 +353,14 @@ func (s *Store) UpdateColumn(id string, in *Column) (*Column, error) {
 	return &c, nil
 }
 
-func (s *Store) DeleteColumn(id string) error {
+func (s *Store) DeleteColumn(userID, id string) error {
+	boardID, err := s.boardIDForColumn(id)
+	if err != nil {
+		return err
+	}
+	if err := s.requireMember(boardID, userID); err != nil {
+		return err
+	}
 	res, err := s.db.Exec(`DELETE FROM columns WHERE id = $1`, id)
 	if err != nil {
 		return err
@@ -189,8 +391,15 @@ func (s *Store) listCardsByColumn(columnID string) ([]*Card, error) {
 	return cards, rows.Err()
 }
 
-func (s *Store) CreateCard(in *Card) (*Card, error) {
-	err := s.db.QueryRow(
+func (s *Store) CreateCard(userID string, in *Card) (*Card, error) {
+	boardID, err := s.boardIDForColumn(in.ColumnID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.requireMember(boardID, userID); err != nil {
+		return nil, err
+	}
+	err = s.db.QueryRow(
 		`INSERT INTO cards (column_id, title, description, position) VALUES ($1, $2, $3, $4) RETURNING id, created_at, updated_at`,
 		in.ColumnID, in.Title, in.Description, in.Position,
 	).Scan(&in.ID, &in.CreatedAt, &in.UpdatedAt)
@@ -200,7 +409,14 @@ func (s *Store) CreateCard(in *Card) (*Card, error) {
 	return in, nil
 }
 
-func (s *Store) UpdateCard(id string, in *Card) (*Card, error) {
+func (s *Store) UpdateCard(userID, id string, in *Card) (*Card, error) {
+	boardID, err := s.boardIDForCard(id)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.requireMember(boardID, userID); err != nil {
+		return nil, err
+	}
 	res, err := s.db.Exec(
 		`UPDATE cards SET title = $1, description = $2, updated_at = now() WHERE id = $3`,
 		in.Title, in.Description, id,
@@ -215,8 +431,24 @@ func (s *Store) UpdateCard(id string, in *Card) (*Card, error) {
 }
 
 // MoveCard moves a card to another column (or reorders it within the same
-// column) by setting its column_id and position.
-func (s *Store) MoveCard(id string, columnID string, position int) (*Card, error) {
+// column) by setting its column_id and position. Both the source and
+// destination columns must belong to a board userID is a member of.
+func (s *Store) MoveCard(userID, id string, columnID string, position int) (*Card, error) {
+	currentBoardID, err := s.boardIDForCard(id)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.requireMember(currentBoardID, userID); err != nil {
+		return nil, err
+	}
+	destBoardID, err := s.boardIDForColumn(columnID)
+	if err != nil {
+		return nil, err
+	}
+	if destBoardID != currentBoardID {
+		return nil, ErrForbidden
+	}
+
 	res, err := s.db.Exec(
 		`UPDATE cards SET column_id = $1, position = $2, updated_at = now() WHERE id = $3`,
 		columnID, position, id,
@@ -243,7 +475,14 @@ func (s *Store) getCard(id string) (*Card, error) {
 	return &c, nil
 }
 
-func (s *Store) DeleteCard(id string) error {
+func (s *Store) DeleteCard(userID, id string) error {
+	boardID, err := s.boardIDForCard(id)
+	if err != nil {
+		return err
+	}
+	if err := s.requireMember(boardID, userID); err != nil {
+		return err
+	}
 	res, err := s.db.Exec(`DELETE FROM cards WHERE id = $1`, id)
 	if err != nil {
 		return err

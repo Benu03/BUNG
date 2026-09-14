@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { ArrowLeft, Boxes, LogOut, Shield, Users as UsersIcon, LayoutGrid, Settings as SettingsIcon, ScrollText } from 'lucide-react'
+import { ArrowLeft, LogOut, Shield, Users as UsersIcon, LayoutGrid, Settings as SettingsIcon, ScrollText } from 'lucide-react'
 import Users from './components/Users.jsx'
 import Roles from './components/Roles.jsx'
 import Modules from './components/Modules.jsx'
 import Settings from './components/Settings.jsx'
 import AuditLog from './components/AuditLog.jsx'
+import Logo from './components/Logo.jsx'
+import ThemeToggle from './components/ThemeToggle.jsx'
 import { Button } from './components/ui/button.jsx'
 import { cn } from './lib/utils.js'
 
@@ -30,15 +32,14 @@ export default function App() {
       <header className="sticky top-0 z-10 bg-gradient-to-r from-primary to-primary-dark text-primary-foreground shadow-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3.5">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15">
-              <Boxes className="h-4 w-4" />
-            </div>
+            <Logo className="h-8 w-8" />
             <div>
               <div className="text-sm font-semibold leading-none">App Maintenance</div>
               <div className="text-xs text-primary-foreground/70">Users, roles &amp; modules</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <ThemeToggle className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <Button size="sm" asChild className="border border-white/25 bg-white/10 text-primary-foreground shadow-none hover:bg-white/20">
               <a href="/">
                 <ArrowLeft />
