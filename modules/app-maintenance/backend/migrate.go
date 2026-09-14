@@ -173,6 +173,7 @@ func seed(db *sql.DB) error {
 	knownModules := []struct{ code, name, description string }{
 		{"app-maintenance", "App Maintenance", "User, module and role administration"},
 		{"kanban", "Kanban", "Boards, columns and cards"},
+		{"my-storage", "My Storage", "Your private files"},
 	}
 
 	adminRoleIDs := make([]string, 0, len(knownModules))

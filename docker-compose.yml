@@ -48,6 +48,8 @@ services:
       - app-maintenance-backend
       - kanban-frontend
       - kanban-backend
+      - my-storage-frontend
+      - my-storage-backend
     restart: unless-stopped
 
 # Every module shares this one Postgres instance/database, but lives in its
@@ -74,3 +76,4 @@ services:
 include:
   - modules/app-maintenance/docker-compose.yml
   - modules/kanban/docker-compose.yml
+  - modules/my-storage/docker-compose.yml
