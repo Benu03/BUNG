@@ -35,3 +35,30 @@ type Role struct {
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
+
+// createUserRequest is the payload for POST /users - separate from User so
+// a plaintext Password never round-trips through a User value (which is
+// also what every other handler returns to clients).
+type createUserRequest struct {
+	Username string `json:"username"`
+	FullName string `json:"fullName"`
+	Email    string `json:"email"`
+	IsActive bool   `json:"isActive"`
+	Password string `json:"password"`
+}
+
+// loginRequest is the payload for POST /auth/login.
+type loginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// AuthUser is what login/me hand back to the frontend: the user plus the
+// modules their roles grant access to (what the portal renders).
+type AuthUser struct {
+	ID       string    `json:"id"`
+	Username string    `json:"username"`
+	FullName string    `json:"fullName"`
+	Email    string    `json:"email"`
+	Modules  []*Module `json:"modules"`
+}

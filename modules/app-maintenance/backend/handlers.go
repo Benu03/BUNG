@@ -63,17 +63,51 @@ func (a *api) getUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *api) createUser(w http.ResponseWriter, r *http.Request) {
-	var in User
+	var in createUserRequest
 	if err := decodeJSON(r, &in); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid body")
 		return
 	}
-	u, err := a.store.CreateUser(&in)
+	if len(in.Password) < 6 {
+		writeErr(w, http.StatusBadRequest, "password must be at least 6 characters")
+		return
+	}
+	hash, err := hashPassword(in.Password)
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+	user := &User{Username: in.Username, FullName: in.FullName, Email: in.Email, IsActive: in.IsActive}
+	u, err := a.store.CreateUser(user, hash)
 	if err != nil {
 		handleErr(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, u)
+}
+
+func (a *api) setUserPassword(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Password string `json:"password"`
+	}
+	if err := decodeJSON(r, &in); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+	if len(in.Password) < 6 {
+		writeErr(w, http.StatusBadRequest, "password must be at least 6 characters")
+		return
+	}
+	hash, err := hashPassword(in.Password)
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+	if err := a.store.SetUserPassword(r.PathValue("id"), hash); err != nil {
+		handleErr(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (a *api) updateUser(w http.ResponseWriter, r *http.Request) {

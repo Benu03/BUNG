@@ -67,17 +67,73 @@ func (s *Store) GetUser(id string) (*User, error) {
 	return &u, nil
 }
 
-func (s *Store) CreateUser(in *User) (*User, error) {
+func (s *Store) CreateUser(in *User, passwordHash string) (*User, error) {
 	err := s.db.QueryRow(
-		`INSERT INTO users (username, full_name, email, is_active) VALUES ($1, $2, $3, $4)
+		`INSERT INTO users (username, full_name, email, is_active, password_hash) VALUES ($1, $2, $3, $4, $5)
 		 RETURNING id, created_at, updated_at`,
-		in.Username, in.FullName, in.Email, in.IsActive,
+		in.Username, in.FullName, in.Email, in.IsActive, passwordHash,
 	).Scan(&in.ID, &in.CreatedAt, &in.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
 	in.RoleIDs = []string{}
 	return in, nil
+}
+
+// GetUserByUsername is used by login - it also returns the password hash,
+// which GetUser deliberately never exposes.
+func (s *Store) GetUserByUsername(username string) (*User, string, error) {
+	var u User
+	var passwordHash string
+	err := s.db.QueryRow(`SELECT id, username, full_name, email, is_active, password_hash, created_at, updated_at FROM users WHERE username = $1`, username).
+		Scan(&u.ID, &u.Username, &u.FullName, &u.Email, &u.IsActive, &passwordHash, &u.CreatedAt, &u.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, "", ErrNotFound
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	return &u, passwordHash, nil
+}
+
+// SetUserPassword replaces a user's password hash (e.g. an admin resetting
+// another user's password from the Users tab).
+func (s *Store) SetUserPassword(id string, passwordHash string) error {
+	res, err := s.db.Exec(`UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2`, passwordHash, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// UserModules returns the distinct, active modules a user can access via
+// any of their roles - this is what gets baked into the session JWT at
+// login, and what the portal renders.
+func (s *Store) UserModules(userID string) ([]*Module, error) {
+	rows, err := s.db.Query(`
+		SELECT DISTINCT m.id, m.code, m.name, m.description, m.is_active, m.created_at, m.updated_at
+		FROM modules m
+		JOIN role_modules rm ON rm.module_id = m.id
+		JOIN user_roles ur ON ur.role_id = rm.role_id
+		WHERE ur.user_id = $1 AND m.is_active = true
+		ORDER BY m.name`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	modules := []*Module{}
+	for rows.Next() {
+		var m Module
+		if err := rows.Scan(&m.ID, &m.Code, &m.Name, &m.Description, &m.IsActive, &m.CreatedAt, &m.UpdatedAt); err != nil {
+			return nil, err
+		}
+		modules = append(modules, &m)
+	}
+	return modules, rows.Err()
 }
 
 func (s *Store) UpdateUser(id string, in *User) (*User, error) {

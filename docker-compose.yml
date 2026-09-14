@@ -38,6 +38,7 @@ services:
       - "${NGINX_PORT:-8080}:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/auth-common.conf:/etc/nginx/auth-common.conf:ro
       - ./modules:/etc/nginx/modules:ro
     networks:
       - app-network

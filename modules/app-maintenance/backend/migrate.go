@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS users (
 	username TEXT UNIQUE NOT NULL,
 	full_name TEXT NOT NULL DEFAULT '',
 	email TEXT NOT NULL DEFAULT '',
+	password_hash TEXT NOT NULL DEFAULT '',
 	is_active BOOLEAN NOT NULL DEFAULT true,
 	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 	updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -121,9 +122,16 @@ func seed(db *sql.DB) error {
 		}
 	}
 
+	// Default admin password - change it after first login (Users tab has
+	// no self-service change yet, use the "Set Password" action).
+	hash, err := hashPassword("admin123")
+	if err != nil {
+		return fmt.Errorf("seed password hash: %w", err)
+	}
+
 	if err := db.QueryRow(
-		`INSERT INTO users (username, full_name, email) VALUES ($1, $2, $3) RETURNING id`,
-		"admin", "System Administrator", "admin@example.com",
+		`INSERT INTO users (username, full_name, email, password_hash) VALUES ($1, $2, $3, $4) RETURNING id`,
+		"admin", "System Administrator", "admin@example.com", hash,
 	).Scan(&userID); err != nil {
 		return fmt.Errorf("seed user: %w", err)
 	}
