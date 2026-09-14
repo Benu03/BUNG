@@ -1,0 +1,27 @@
+# env
+.env
+.env.local
+.env.*.local
+
+# node / frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# go / backend
+/modules/**/backend/server
+/modules/**/backend/*.exe
+/modules/**/backend/bin/
+
+# editor / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# docker
+*.pid

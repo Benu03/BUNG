@@ -1,0 +1,35 @@
+networks:
+  app-network:
+    driver: bridge
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "${NGINX_PORT:-8080}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./modules:/etc/nginx/modules:ro
+    networks:
+      - app-network
+    depends_on:
+      - app-maintenance-frontend
+      - app-maintenance-backend
+    restart: unless-stopped
+
+# Each module lives in its own folder under ./modules/<name> with its own
+# docker-compose.yml (frontend + backend pair) and nginx.conf (gateway
+# location blocks, auto-picked up by the nginx service above).
+#
+# To add a new module, e.g. "finance":
+#   1. Copy modules/app-maintenance to modules/finance
+#   2. In modules/finance/docker-compose.yml, rename the services
+#      (app-maintenance-frontend/backend -> finance-frontend/backend)
+#   3. In modules/finance/nginx.conf, change the path prefixes and
+#      upstream service names (/app-maintenance/ -> /finance/)
+#   4. In modules/finance/frontend/vite.config.js, update the default base
+#   5. Add finance's PORT / VITE_BASE vars to .env (see .env.example)
+#   6. Add an `include:` entry below pointing at modules/finance/docker-compose.yml
+#   7. docker compose up -d --build
+include:
+  - modules/app-maintenance/docker-compose.yml

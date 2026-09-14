@@ -1,0 +1,18 @@
+services:
+  app-maintenance-frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_BASE: ${APP_MAINTENANCE_VITE_BASE:-/app-maintenance/}
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  app-maintenance-backend:
+    build:
+      context: ./backend
+    environment:
+      - PORT=${APP_MAINTENANCE_BACKEND_PORT:-8080}
+    networks:
+      - app-network
+    restart: unless-stopped
