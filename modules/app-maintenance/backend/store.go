@@ -36,7 +36,7 @@ func NewStore(db *sql.DB) *Store {
 // ---- users ----
 
 func (s *Store) ListUsers() ([]*User, error) {
-	rows, err := s.db.Query(`SELECT id, username, full_name, email, is_active, created_at, updated_at FROM users ORDER BY created_at`)
+	rows, err := s.db.Query(`SELECT id, username, full_name, email, is_active, password_changed_at, created_at, updated_at FROM users ORDER BY created_at`)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func (s *Store) ListUsers() ([]*User, error) {
 	var users []*User
 	for rows.Next() {
 		var u User
-		if err := rows.Scan(&u.ID, &u.Username, &u.FullName, &u.Email, &u.IsActive, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.FullName, &u.Email, &u.IsActive, &u.PasswordChangedAt, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, &u)
@@ -65,8 +65,8 @@ func (s *Store) ListUsers() ([]*User, error) {
 
 func (s *Store) GetUser(id string) (*User, error) {
 	var u User
-	err := s.db.QueryRow(`SELECT id, username, full_name, email, is_active, created_at, updated_at FROM users WHERE id = $1`, id).
-		Scan(&u.ID, &u.Username, &u.FullName, &u.Email, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+	err := s.db.QueryRow(`SELECT id, username, full_name, email, is_active, password_changed_at, created_at, updated_at FROM users WHERE id = $1`, id).
+		Scan(&u.ID, &u.Username, &u.FullName, &u.Email, &u.IsActive, &u.PasswordChangedAt, &u.CreatedAt, &u.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -84,10 +84,13 @@ func (s *Store) GetUser(id string) (*User, error) {
 func (s *Store) CreateUser(in *User, passwordHash string) (*User, error) {
 	err := s.db.QueryRow(
 		`INSERT INTO users (username, full_name, email, is_active, password_hash) VALUES ($1, $2, $3, $4, $5)
-		 RETURNING id, created_at, updated_at`,
+		 RETURNING id, password_changed_at, created_at, updated_at`,
 		in.Username, in.FullName, in.Email, in.IsActive, passwordHash,
-	).Scan(&in.ID, &in.CreatedAt, &in.UpdatedAt)
+	).Scan(&in.ID, &in.PasswordChangedAt, &in.CreatedAt, &in.UpdatedAt)
 	if err != nil {
+		if isUniqueViolation(err) {
+			return nil, ErrConflict
+		}
 		return nil, err
 	}
 	in.RoleIDs = []string{}
@@ -97,10 +100,26 @@ func (s *Store) CreateUser(in *User, passwordHash string) (*User, error) {
 // GetUserByUsername is used by login - it also returns the password hash,
 // which GetUser deliberately never exposes.
 func (s *Store) GetUserByUsername(username string) (*User, string, error) {
+	return s.getUserByColumn("username", username)
+}
+
+// GetUserByIdentifier is used by forgot-password - identifier can be either
+// a username or an email.
+func (s *Store) GetUserByIdentifier(identifier string) (*User, string, error) {
+	return s.getUserByColumn("username_or_email", identifier)
+}
+
+func (s *Store) getUserByColumn(mode, value string) (*User, string, error) {
+	query := `SELECT id, username, full_name, email, is_active, password_hash, password_changed_at, created_at, updated_at FROM users WHERE `
+	if mode == "username" {
+		query += `username = $1`
+	} else {
+		query += `username = $1 OR email = $1`
+	}
 	var u User
 	var passwordHash string
-	err := s.db.QueryRow(`SELECT id, username, full_name, email, is_active, password_hash, created_at, updated_at FROM users WHERE username = $1`, username).
-		Scan(&u.ID, &u.Username, &u.FullName, &u.Email, &u.IsActive, &passwordHash, &u.CreatedAt, &u.UpdatedAt)
+	err := s.db.QueryRow(query, value).
+		Scan(&u.ID, &u.Username, &u.FullName, &u.Email, &u.IsActive, &passwordHash, &u.PasswordChangedAt, &u.CreatedAt, &u.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, "", ErrNotFound
 	}
@@ -110,10 +129,11 @@ func (s *Store) GetUserByUsername(username string) (*User, string, error) {
 	return &u, passwordHash, nil
 }
 
-// SetUserPassword replaces a user's password hash (e.g. an admin resetting
-// another user's password from the Users tab).
+// SetUserPassword replaces a user's password hash and resets the
+// password-age clock (password_changed_at) - used by the admin "Set
+// Password" action, self-service change-password, and forgot-password reset.
 func (s *Store) SetUserPassword(id string, passwordHash string) error {
-	res, err := s.db.Exec(`UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2`, passwordHash, id)
+	res, err := s.db.Exec(`UPDATE users SET password_hash = $1, password_changed_at = now(), updated_at = now() WHERE id = $2`, passwordHash, id)
 	if err != nil {
 		return err
 	}
@@ -157,6 +177,9 @@ func (s *Store) UpdateUser(id string, in *User) (*User, error) {
 		in.Username, in.FullName, in.Email, in.IsActive, id,
 	)
 	if err != nil {
+		if isUniqueViolation(err) {
+			return nil, ErrConflict
+		}
 		return nil, err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
@@ -367,8 +390,8 @@ func (s *Store) DeleteModule(id string) error {
 
 func (s *Store) GetSiteSettings() (*SiteSettings, error) {
 	var st SiteSettings
-	err := s.db.QueryRow(`SELECT site_name, tagline, announcement, updated_at FROM site_settings WHERE id = 'default'`).
-		Scan(&st.SiteName, &st.Tagline, &st.Announcement, &st.UpdatedAt)
+	err := s.db.QueryRow(`SELECT site_name, tagline, announcement, password_expiry_days, updated_at FROM site_settings WHERE id = 'default'`).
+		Scan(&st.SiteName, &st.Tagline, &st.Announcement, &st.PasswordExpiryDays, &st.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -380,11 +403,56 @@ func (s *Store) GetSiteSettings() (*SiteSettings, error) {
 
 func (s *Store) UpdateSiteSettings(in *SiteSettings) (*SiteSettings, error) {
 	_, err := s.db.Exec(
-		`UPDATE site_settings SET site_name = $1, tagline = $2, announcement = $3, updated_at = now() WHERE id = 'default'`,
-		in.SiteName, in.Tagline, in.Announcement,
+		`UPDATE site_settings SET site_name = $1, tagline = $2, announcement = $3, password_expiry_days = $4, updated_at = now() WHERE id = 'default'`,
+		in.SiteName, in.Tagline, in.Announcement, in.PasswordExpiryDays,
 	)
 	if err != nil {
 		return nil, err
 	}
 	return s.GetSiteSettings()
+}
+
+// ---- password resets ----
+
+// CreatePasswordReset stores a (hashed) reset token for userID, valid until
+// expiresAt.
+func (s *Store) CreatePasswordReset(userID, tokenHash string, expiresAt time.Time) error {
+	_, err := s.db.Exec(
+		`INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
+		userID, tokenHash, expiresAt,
+	)
+	return err
+}
+
+// ConsumePasswordReset atomically validates a (hashed) reset token - must
+// exist, be unexpired, and not already used - marks it used, and returns
+// the user it belongs to. Using it twice (e.g. a replayed request) fails
+// the second time.
+func (s *Store) ConsumePasswordReset(tokenHash string) (string, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback()
+
+	var id, userID string
+	err = tx.QueryRow(
+		`SELECT id, user_id FROM password_resets
+		 WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()`,
+		tokenHash,
+	).Scan(&id, &userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+
+	if _, err := tx.Exec(`UPDATE password_resets SET used_at = now() WHERE id = $1`, id); err != nil {
+		return "", err
+	}
+	if err := tx.Commit(); err != nil {
+		return "", err
+	}
+	return userID, nil
 }

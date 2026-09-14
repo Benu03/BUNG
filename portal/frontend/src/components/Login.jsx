@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from './ui/alert.jsx'
 import Logo from './Logo.jsx'
 import ThemeToggle from './ThemeToggle.jsx'
 
-export default function Login({ onLoggedIn, notice, settings }) {
+export default function Login({ onLoggedIn, notice, settings, onForgotPassword }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -85,7 +85,12 @@ export default function Login({ onLoggedIn, notice, settings }) {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="password">Password</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <button type="button" onClick={onForgotPassword} className="text-xs text-muted-foreground hover:text-foreground hover:underline">
+                    Forgot password?
+                  </button>
+                </div>
                 <Input
                   id="password"
                   type="password"

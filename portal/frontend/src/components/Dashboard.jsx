@@ -1,4 +1,4 @@
-import { ArrowRight, LogOut, Megaphone, PackageOpen } from 'lucide-react'
+import { ArrowRight, KeyRound, LogOut, Megaphone, PackageOpen } from 'lucide-react'
 import { Button } from './ui/button.jsx'
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from './ui/card.jsx'
 import { Alert, AlertDescription } from './ui/alert.jsx'
@@ -23,7 +23,7 @@ function initials(name) {
     .toUpperCase()
 }
 
-export default function Dashboard({ user, onLogout, settings }) {
+export default function Dashboard({ user, onLogout, settings, onChangePassword }) {
   const modules = user.modules || []
 
   return (
@@ -36,6 +36,14 @@ export default function Dashboard({ user, onLogout, settings }) {
           </div>
           <div className="flex items-center gap-2">
             <span className="mr-1 text-sm text-primary-foreground/80">{user.fullName || user.username}</span>
+            <Button
+              size="icon"
+              title="Change password"
+              onClick={onChangePassword}
+              className="border border-white/25 bg-white/10 text-primary-foreground shadow-none hover:bg-white/20"
+            >
+              <KeyRound className="h-4 w-4" />
+            </Button>
             <ThemeToggle className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <Button
               size="sm"

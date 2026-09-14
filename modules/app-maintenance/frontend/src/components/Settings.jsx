@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Save, TriangleAlert, CheckCircle2 } from 'lucide-react'
+import { Save, TriangleAlert, CheckCircle2, ShieldAlert } from 'lucide-react'
 import { api } from '../api.js'
 import { Button } from './ui/button.jsx'
 import { Input } from './ui/input.jsx'
@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/
 import { Alert, AlertDescription } from './ui/alert.jsx'
 
 export default function Settings() {
-  const [form, setForm] = useState({ siteName: '', tagline: '', announcement: '' })
+  const [form, setForm] = useState({ siteName: '', tagline: '', announcement: '', passwordExpiryDays: 60 })
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
 
@@ -21,7 +21,7 @@ export default function Settings() {
     setError('')
     setSaved(false)
     try {
-      const updated = await api.updateSettings(form)
+      const updated = await api.updateSettings({ ...form, passwordExpiryDays: Number(form.passwordExpiryDays) || 0 })
       setForm(updated)
       setSaved(true)
     } catch (e) {
@@ -60,6 +60,20 @@ export default function Settings() {
               <Input id="s-announcement" placeholder="Optional banner shown on the module dashboard - leave blank to hide"
                 value={form.announcement} onChange={(e) => setForm({ ...form, announcement: e.target.value })} />
             </div>
+
+            <div className="mt-2 flex items-center gap-1.5 border-t pt-4 text-sm font-medium">
+              <ShieldAlert className="h-4 w-4" />
+              Security policy
+            </div>
+            <div className="grid gap-1.5 sm:max-w-xs">
+              <Label htmlFor="s-expiry">Password expiry (days)</Label>
+              <Input id="s-expiry" type="number" min={0} value={form.passwordExpiryDays}
+                onChange={(e) => setForm({ ...form, passwordExpiryDays: e.target.value })} />
+              <p className="text-xs text-muted-foreground">
+                Users are forced to change their password after this many days (default 60, ~2 months). Set to 0 to disable.
+              </p>
+            </div>
+
             <div className="flex items-center gap-3">
               <Button type="submit">
                 <Save />

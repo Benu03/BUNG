@@ -24,23 +24,32 @@ func main() {
 		}
 	}
 
+	publicBaseURL := os.Getenv("PUBLIC_BASE_URL")
+	if publicBaseURL == "" {
+		publicBaseURL = "http://localhost:8080"
+	}
+
 	db := openDB()
 	defer db.Close()
 
 	store := NewStore(db)
 	a := &api{store: store}
-	auth := newAuthAPI(store, jwtSecret, tokenTTL)
+	auth := newAuthAPI(store, jwtSecret, tokenTTL, newEmailSender(), publicBaseURL)
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /health", a.health)
 
 	// auth - not gated by nginx's auth_request (login/verify would be
 	// circular, and the frontend needs an unauthenticated way to ask
-	// "am I logged in").
+	// "am I logged in"). change-password/me/verify still self-enforce a
+	// valid session by reading the cookie themselves.
 	mux.HandleFunc("POST /auth/login", auth.login)
 	mux.HandleFunc("POST /auth/logout", auth.logout)
 	mux.HandleFunc("GET /auth/me", auth.me)
 	mux.HandleFunc("GET /auth/verify", auth.verify)
+	mux.HandleFunc("POST /auth/change-password", auth.changePassword)
+	mux.HandleFunc("POST /auth/forgot-password", auth.forgotPassword)
+	mux.HandleFunc("POST /auth/reset-password", auth.resetPassword)
 
 	mux.HandleFunc("GET /users", a.listUsers)
 	mux.HandleFunc("POST /users", a.createUser)

@@ -1,0 +1,36 @@
+services:
+  my-storage-frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_BASE: ${MY_STORAGE_VITE_BASE:-/my-storage/}
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  my-storage-backend:
+    build:
+      context: ./backend
+    environment:
+      - PORT=${MY_STORAGE_BACKEND_PORT:-8080}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-bung}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-bung}
+      - DB_NAME=${POSTGRES_DB:-bung}
+      - DB_SCHEMA=${MY_STORAGE_DB_SCHEMA:-my_storage}
+      - DB_SSLMODE=disable
+      - DATA_DIR=/data
+    volumes:
+      - my-storage-data:/data
+    networks:
+      - app-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      app-maintenance-backend:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  my-storage-data:

@@ -28,6 +28,10 @@ func handleErr(w http.ResponseWriter, err error) {
 		writeErr(w, http.StatusNotFound, "not found")
 		return
 	}
+	if errors.Is(err, ErrConflict) {
+		writeErr(w, http.StatusConflict, "username or email is already in use")
+		return
+	}
 	log.Printf("internal error: %v", err)
 	writeErr(w, http.StatusInternalServerError, "internal error")
 }
