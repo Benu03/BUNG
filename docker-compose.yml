@@ -2,7 +2,36 @@ networks:
   app-network:
     driver: bridge
 
+volumes:
+  postgres-data:
+
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-bung}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-bung}
+      - POSTGRES_DB=${POSTGRES_DB:-bung}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432" # optional, handy for local DB tools; remove for prod
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bung}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  portal-frontend:
+    build:
+      context: ./portal/frontend
+    networks:
+      - app-network
+    restart: unless-stopped
+
   nginx:
     image: nginx:1.27-alpine
     ports:
@@ -13,10 +42,18 @@ services:
     networks:
       - app-network
     depends_on:
+      - portal-frontend
       - app-maintenance-frontend
       - app-maintenance-backend
+      - kanban-frontend
+      - kanban-backend
     restart: unless-stopped
 
+# Every module shares this one Postgres instance/database, but lives in its
+# own schema (see each module's DB_SCHEMA env var) - so modules never
+# collide and adding a module never needs a manual DB setup step; each
+# backend creates its own schema on startup (see backend/migrate.go).
+#
 # Each module lives in its own folder under ./modules/<name> with its own
 # docker-compose.yml (frontend + backend pair) and nginx.conf (gateway
 # location blocks, auto-picked up by the nginx service above).
@@ -24,12 +61,15 @@ services:
 # To add a new module, e.g. "finance":
 #   1. Copy modules/app-maintenance to modules/finance
 #   2. In modules/finance/docker-compose.yml, rename the services
-#      (app-maintenance-frontend/backend -> finance-frontend/backend)
+#      (app-maintenance-frontend/backend -> finance-frontend/backend) and
+#      set DB_SCHEMA to a new schema name (e.g. finance)
 #   3. In modules/finance/nginx.conf, change the path prefixes and
 #      upstream service names (/app-maintenance/ -> /finance/)
 #   4. In modules/finance/frontend/vite.config.js, update the default base
-#   5. Add finance's PORT / VITE_BASE vars to .env (see .env.example)
+#   5. Add finance's PORT / VITE_BASE / DB_SCHEMA vars to .env (see .env.example)
 #   6. Add an `include:` entry below pointing at modules/finance/docker-compose.yml
-#   7. docker compose up -d --build
+#   7. Add finance-frontend/finance-backend to nginx's depends_on above
+#   8. docker compose up -d --build
 include:
   - modules/app-maintenance/docker-compose.yml
+  - modules/kanban/docker-compose.yml

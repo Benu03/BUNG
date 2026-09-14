@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"log"
 	"net/http"
 )
 
@@ -19,6 +21,16 @@ func writeErr(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
+// handleErr maps a Store error to the right HTTP response.
+func handleErr(w http.ResponseWriter, err error) {
+	if errors.Is(err, ErrNotFound) {
+		writeErr(w, http.StatusNotFound, "not found")
+		return
+	}
+	log.Printf("internal error: %v", err)
+	writeErr(w, http.StatusInternalServerError, "internal error")
+}
+
 func decodeJSON(r *http.Request, v any) error {
 	defer r.Body.Close()
 	return json.NewDecoder(r.Body).Decode(v)
@@ -33,13 +45,18 @@ func (a *api) health(w http.ResponseWriter, r *http.Request) {
 // ---- users ----
 
 func (a *api) listUsers(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, a.store.ListUsers())
+	users, err := a.store.ListUsers()
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, users)
 }
 
 func (a *api) getUser(w http.ResponseWriter, r *http.Request) {
-	u, ok := a.store.GetUser(r.PathValue("id"))
-	if !ok {
-		writeErr(w, http.StatusNotFound, "user not found")
+	u, err := a.store.GetUser(r.PathValue("id"))
+	if err != nil {
+		handleErr(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, u)
@@ -51,7 +68,12 @@ func (a *api) createUser(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid body")
 		return
 	}
-	writeJSON(w, http.StatusCreated, a.store.CreateUser(&in))
+	u, err := a.store.CreateUser(&in)
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, u)
 }
 
 func (a *api) updateUser(w http.ResponseWriter, r *http.Request) {
@@ -60,17 +82,17 @@ func (a *api) updateUser(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid body")
 		return
 	}
-	u, ok := a.store.UpdateUser(r.PathValue("id"), &in)
-	if !ok {
-		writeErr(w, http.StatusNotFound, "user not found")
+	u, err := a.store.UpdateUser(r.PathValue("id"), &in)
+	if err != nil {
+		handleErr(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, u)
 }
 
 func (a *api) deleteUser(w http.ResponseWriter, r *http.Request) {
-	if !a.store.DeleteUser(r.PathValue("id")) {
-		writeErr(w, http.StatusNotFound, "user not found")
+	if err := a.store.DeleteUser(r.PathValue("id")); err != nil {
+		handleErr(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -84,9 +106,9 @@ func (a *api) setUserRoles(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid body")
 		return
 	}
-	u, ok := a.store.SetUserRoles(r.PathValue("id"), in.RoleIDs)
-	if !ok {
-		writeErr(w, http.StatusNotFound, "user not found")
+	u, err := a.store.SetUserRoles(r.PathValue("id"), in.RoleIDs)
+	if err != nil {
+		handleErr(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, u)
@@ -95,13 +117,18 @@ func (a *api) setUserRoles(w http.ResponseWriter, r *http.Request) {
 // ---- roles ----
 
 func (a *api) listRoles(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, a.store.ListRoles())
+	roles, err := a.store.ListRoles()
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, roles)
 }
 
 func (a *api) getRole(w http.ResponseWriter, r *http.Request) {
-	role, ok := a.store.GetRole(r.PathValue("id"))
-	if !ok {
-		writeErr(w, http.StatusNotFound, "role not found")
+	role, err := a.store.GetRole(r.PathValue("id"))
+	if err != nil {
+		handleErr(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, role)
@@ -113,7 +140,12 @@ func (a *api) createRole(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid body")
 		return
 	}
-	writeJSON(w, http.StatusCreated, a.store.CreateRole(&in))
+	role, err := a.store.CreateRole(&in)
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, role)
 }
 
 func (a *api) updateRole(w http.ResponseWriter, r *http.Request) {
@@ -122,17 +154,17 @@ func (a *api) updateRole(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid body")
 		return
 	}
-	role, ok := a.store.UpdateRole(r.PathValue("id"), &in)
-	if !ok {
-		writeErr(w, http.StatusNotFound, "role not found")
+	role, err := a.store.UpdateRole(r.PathValue("id"), &in)
+	if err != nil {
+		handleErr(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, role)
 }
 
 func (a *api) deleteRole(w http.ResponseWriter, r *http.Request) {
-	if !a.store.DeleteRole(r.PathValue("id")) {
-		writeErr(w, http.StatusNotFound, "role not found")
+	if err := a.store.DeleteRole(r.PathValue("id")); err != nil {
+		handleErr(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -141,13 +173,18 @@ func (a *api) deleteRole(w http.ResponseWriter, r *http.Request) {
 // ---- modules ----
 
 func (a *api) listModules(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, a.store.ListModules())
+	modules, err := a.store.ListModules()
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, modules)
 }
 
 func (a *api) getModule(w http.ResponseWriter, r *http.Request) {
-	m, ok := a.store.GetModule(r.PathValue("id"))
-	if !ok {
-		writeErr(w, http.StatusNotFound, "module not found")
+	m, err := a.store.GetModule(r.PathValue("id"))
+	if err != nil {
+		handleErr(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, m)
@@ -159,7 +196,12 @@ func (a *api) createModule(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid body")
 		return
 	}
-	writeJSON(w, http.StatusCreated, a.store.CreateModule(&in))
+	m, err := a.store.CreateModule(&in)
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, m)
 }
 
 func (a *api) updateModule(w http.ResponseWriter, r *http.Request) {
@@ -168,17 +210,17 @@ func (a *api) updateModule(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid body")
 		return
 	}
-	m, ok := a.store.UpdateModule(r.PathValue("id"), &in)
-	if !ok {
-		writeErr(w, http.StatusNotFound, "module not found")
+	m, err := a.store.UpdateModule(r.PathValue("id"), &in)
+	if err != nil {
+		handleErr(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, m)
 }
 
 func (a *api) deleteModule(w http.ResponseWriter, r *http.Request) {
-	if !a.store.DeleteModule(r.PathValue("id")) {
-		writeErr(w, http.StatusNotFound, "module not found")
+	if err := a.store.DeleteModule(r.PathValue("id")); err != nil {
+		handleErr(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

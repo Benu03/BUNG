@@ -1,4 +1,4 @@
-module app-maintenance-backend
+module kanban-backend
 
 go 1.23
 

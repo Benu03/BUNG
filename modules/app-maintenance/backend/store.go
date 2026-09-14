@@ -1,250 +1,352 @@
 package main
 
 import (
-	"fmt"
-	"sync"
-	"time"
+	"database/sql"
+	"errors"
 )
 
-// Store is a simple in-memory, mutex-guarded data store.
-//
-// This is a starting point for the app-maintenance module so the whole
-// stack (frontend <-> nginx <-> backend) can be scaffolded and run
-// end-to-end without an external database. Swap this out for a real
-// database (Postgres, SQLite, ...) once the shape of the data settles.
+// ErrNotFound is returned by Store methods when the requested row doesn't
+// exist, so handlers can tell that apart from a real (5xx) failure.
+var ErrNotFound = errors.New("not found")
+
+// Store is backed by Postgres, scoped to this module's schema via the
+// connection's search_path (see db.go).
 type Store struct {
-	mu      sync.RWMutex
-	users   map[string]*User
-	roles   map[string]*Role
-	modules map[string]*Module
-	seq     int
+	db *sql.DB
 }
 
-func NewStore() *Store {
-	s := &Store{
-		users:   map[string]*User{},
-		roles:   map[string]*Role{},
-		modules: map[string]*Module{},
+func NewStore(db *sql.DB) *Store {
+	return &Store{db: db}
+}
+
+// ---- users ----
+
+func (s *Store) ListUsers() ([]*User, error) {
+	rows, err := s.db.Query(`SELECT id, username, full_name, email, is_active, created_at, updated_at FROM users ORDER BY created_at`)
+	if err != nil {
+		return nil, err
 	}
-	s.seed()
-	return s
-}
+	defer rows.Close()
 
-func (s *Store) nextID(prefix string) string {
-	s.seq++
-	return fmt.Sprintf("%s-%d", prefix, s.seq)
-}
-
-func (s *Store) seed() {
-	now := time.Now()
-
-	modAppMaint := &Module{ID: s.nextID("mod"), Code: "app-maintenance", Name: "App Maintenance", Description: "User, module and role administration", IsActive: true, CreatedAt: now, UpdatedAt: now}
-	s.modules[modAppMaint.ID] = modAppMaint
-
-	adminRole := &Role{ID: s.nextID("role"), Name: "Administrator", Description: "Full access to all modules", ModuleIDs: []string{modAppMaint.ID}, CreatedAt: now, UpdatedAt: now}
-	s.roles[adminRole.ID] = adminRole
-
-	admin := &User{ID: s.nextID("user"), Username: "admin", FullName: "System Administrator", Email: "admin@example.com", IsActive: true, RoleIDs: []string{adminRole.ID}, CreatedAt: now, UpdatedAt: now}
-	s.users[admin.ID] = admin
-}
-
-// ---- Users ----
-
-func (s *Store) ListUsers() []*User {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	out := make([]*User, 0, len(s.users))
-	for _, u := range s.users {
-		out = append(out, u)
+	var users []*User
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(&u.ID, &u.Username, &u.FullName, &u.Email, &u.IsActive, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, &u)
 	}
-	return out
-}
-
-func (s *Store) GetUser(id string) (*User, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	u, ok := s.users[id]
-	return u, ok
-}
-
-func (s *Store) CreateUser(in *User) *User {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	now := time.Now()
-	in.ID = s.nextID("user")
-	in.CreatedAt = now
-	in.UpdatedAt = now
-	if in.RoleIDs == nil {
-		in.RoleIDs = []string{}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
-	s.users[in.ID] = in
-	return in
-}
-
-func (s *Store) UpdateUser(id string, in *User) (*User, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	existing, ok := s.users[id]
-	if !ok {
-		return nil, false
+	for _, u := range users {
+		roleIDs, err := s.userRoleIDs(u.ID)
+		if err != nil {
+			return nil, err
+		}
+		u.RoleIDs = roleIDs
 	}
-	existing.Username = in.Username
-	existing.FullName = in.FullName
-	existing.Email = in.Email
-	existing.IsActive = in.IsActive
-	existing.UpdatedAt = time.Now()
-	return existing, true
+	return users, nil
 }
 
-func (s *Store) DeleteUser(id string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if _, ok := s.users[id]; !ok {
-		return false
+func (s *Store) GetUser(id string) (*User, error) {
+	var u User
+	err := s.db.QueryRow(`SELECT id, username, full_name, email, is_active, created_at, updated_at FROM users WHERE id = $1`, id).
+		Scan(&u.ID, &u.Username, &u.FullName, &u.Email, &u.IsActive, &u.CreatedAt, &u.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
 	}
-	delete(s.users, id)
-	return true
-}
-
-func (s *Store) SetUserRoles(id string, roleIDs []string) (*User, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	u, ok := s.users[id]
-	if !ok {
-		return nil, false
+	if err != nil {
+		return nil, err
+	}
+	roleIDs, err := s.userRoleIDs(u.ID)
+	if err != nil {
+		return nil, err
 	}
 	u.RoleIDs = roleIDs
-	u.UpdatedAt = time.Now()
-	return u, true
+	return &u, nil
 }
 
-// ---- Roles ----
-
-func (s *Store) ListRoles() []*Role {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	out := make([]*Role, 0, len(s.roles))
-	for _, r := range s.roles {
-		out = append(out, r)
+func (s *Store) CreateUser(in *User) (*User, error) {
+	err := s.db.QueryRow(
+		`INSERT INTO users (username, full_name, email, is_active) VALUES ($1, $2, $3, $4)
+		 RETURNING id, created_at, updated_at`,
+		in.Username, in.FullName, in.Email, in.IsActive,
+	).Scan(&in.ID, &in.CreatedAt, &in.UpdatedAt)
+	if err != nil {
+		return nil, err
 	}
-	return out
+	in.RoleIDs = []string{}
+	return in, nil
 }
 
-func (s *Store) GetRole(id string) (*Role, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	r, ok := s.roles[id]
-	return r, ok
+func (s *Store) UpdateUser(id string, in *User) (*User, error) {
+	res, err := s.db.Exec(
+		`UPDATE users SET username = $1, full_name = $2, email = $3, is_active = $4, updated_at = now() WHERE id = $5`,
+		in.Username, in.FullName, in.Email, in.IsActive, id,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return nil, ErrNotFound
+	}
+	return s.GetUser(id)
 }
 
-func (s *Store) CreateRole(in *Role) *Role {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	now := time.Now()
-	in.ID = s.nextID("role")
-	in.CreatedAt = now
-	in.UpdatedAt = now
+func (s *Store) DeleteUser(id string) error {
+	res, err := s.db.Exec(`DELETE FROM users WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) SetUserRoles(id string, roleIDs []string) (*User, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var exists bool
+	if err := tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`, id).Scan(&exists); err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, ErrNotFound
+	}
+
+	if _, err := tx.Exec(`DELETE FROM user_roles WHERE user_id = $1`, id); err != nil {
+		return nil, err
+	}
+	for _, roleID := range roleIDs {
+		if _, err := tx.Exec(`INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, id, roleID); err != nil {
+			return nil, err
+		}
+	}
+	if _, err := tx.Exec(`UPDATE users SET updated_at = now() WHERE id = $1`, id); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return s.GetUser(id)
+}
+
+func (s *Store) userRoleIDs(userID string) ([]string, error) {
+	rows, err := s.db.Query(`SELECT role_id FROM user_roles WHERE user_id = $1`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// ---- roles ----
+
+func (s *Store) ListRoles() ([]*Role, error) {
+	rows, err := s.db.Query(`SELECT id, name, description, created_at, updated_at FROM roles ORDER BY created_at`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var roles []*Role
+	for rows.Next() {
+		var r Role
+		if err := rows.Scan(&r.ID, &r.Name, &r.Description, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			return nil, err
+		}
+		roles = append(roles, &r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for _, r := range roles {
+		moduleIDs, err := s.roleModuleIDs(r.ID)
+		if err != nil {
+			return nil, err
+		}
+		r.ModuleIDs = moduleIDs
+	}
+	return roles, nil
+}
+
+func (s *Store) GetRole(id string) (*Role, error) {
+	var r Role
+	err := s.db.QueryRow(`SELECT id, name, description, created_at, updated_at FROM roles WHERE id = $1`, id).
+		Scan(&r.ID, &r.Name, &r.Description, &r.CreatedAt, &r.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	moduleIDs, err := s.roleModuleIDs(r.ID)
+	if err != nil {
+		return nil, err
+	}
+	r.ModuleIDs = moduleIDs
+	return &r, nil
+}
+
+func (s *Store) CreateRole(in *Role) (*Role, error) {
+	err := s.db.QueryRow(
+		`INSERT INTO roles (name, description) VALUES ($1, $2) RETURNING id, created_at, updated_at`,
+		in.Name, in.Description,
+	).Scan(&in.ID, &in.CreatedAt, &in.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.setRoleModules(in.ID, in.ModuleIDs); err != nil {
+		return nil, err
+	}
 	if in.ModuleIDs == nil {
 		in.ModuleIDs = []string{}
 	}
-	s.roles[in.ID] = in
-	return in
+	return in, nil
 }
 
-func (s *Store) UpdateRole(id string, in *Role) (*Role, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	existing, ok := s.roles[id]
-	if !ok {
-		return nil, false
+func (s *Store) UpdateRole(id string, in *Role) (*Role, error) {
+	res, err := s.db.Exec(
+		`UPDATE roles SET name = $1, description = $2, updated_at = now() WHERE id = $3`,
+		in.Name, in.Description, id,
+	)
+	if err != nil {
+		return nil, err
 	}
-	existing.Name = in.Name
-	existing.Description = in.Description
-	existing.ModuleIDs = in.ModuleIDs
-	existing.UpdatedAt = time.Now()
-	return existing, true
+	if n, _ := res.RowsAffected(); n == 0 {
+		return nil, ErrNotFound
+	}
+	if err := s.setRoleModules(id, in.ModuleIDs); err != nil {
+		return nil, err
+	}
+	return s.GetRole(id)
 }
 
-func (s *Store) DeleteRole(id string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if _, ok := s.roles[id]; !ok {
-		return false
+func (s *Store) DeleteRole(id string) error {
+	res, err := s.db.Exec(`DELETE FROM roles WHERE id = $1`, id)
+	if err != nil {
+		return err
 	}
-	delete(s.roles, id)
-	// unassign from any user that had it
-	for _, u := range s.users {
-		filtered := u.RoleIDs[:0]
-		for _, rid := range u.RoleIDs {
-			if rid != id {
-				filtered = append(filtered, rid)
-			}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) roleModuleIDs(roleID string) ([]string, error) {
+	rows, err := s.db.Query(`SELECT module_id FROM role_modules WHERE role_id = $1`, roleID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
 		}
-		u.RoleIDs = filtered
+		ids = append(ids, id)
 	}
-	return true
+	return ids, rows.Err()
 }
 
-// ---- Modules ----
-
-func (s *Store) ListModules() []*Module {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	out := make([]*Module, 0, len(s.modules))
-	for _, m := range s.modules {
-		out = append(out, m)
+func (s *Store) setRoleModules(roleID string, moduleIDs []string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
 	}
-	return out
-}
+	defer tx.Rollback()
 
-func (s *Store) GetModule(id string) (*Module, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	m, ok := s.modules[id]
-	return m, ok
-}
-
-func (s *Store) CreateModule(in *Module) *Module {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	now := time.Now()
-	in.ID = s.nextID("mod")
-	in.CreatedAt = now
-	in.UpdatedAt = now
-	s.modules[in.ID] = in
-	return in
-}
-
-func (s *Store) UpdateModule(id string, in *Module) (*Module, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	existing, ok := s.modules[id]
-	if !ok {
-		return nil, false
+	if _, err := tx.Exec(`DELETE FROM role_modules WHERE role_id = $1`, roleID); err != nil {
+		return err
 	}
-	existing.Code = in.Code
-	existing.Name = in.Name
-	existing.Description = in.Description
-	existing.IsActive = in.IsActive
-	existing.UpdatedAt = time.Now()
-	return existing, true
-}
-
-func (s *Store) DeleteModule(id string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if _, ok := s.modules[id]; !ok {
-		return false
-	}
-	delete(s.modules, id)
-	for _, r := range s.roles {
-		filtered := r.ModuleIDs[:0]
-		for _, mid := range r.ModuleIDs {
-			if mid != id {
-				filtered = append(filtered, mid)
-			}
+	for _, moduleID := range moduleIDs {
+		if _, err := tx.Exec(`INSERT INTO role_modules (role_id, module_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, roleID, moduleID); err != nil {
+			return err
 		}
-		r.ModuleIDs = filtered
 	}
-	return true
+	return tx.Commit()
+}
+
+// ---- modules ----
+
+func (s *Store) ListModules() ([]*Module, error) {
+	rows, err := s.db.Query(`SELECT id, code, name, description, is_active, created_at, updated_at FROM modules ORDER BY created_at`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var modules []*Module
+	for rows.Next() {
+		var m Module
+		if err := rows.Scan(&m.ID, &m.Code, &m.Name, &m.Description, &m.IsActive, &m.CreatedAt, &m.UpdatedAt); err != nil {
+			return nil, err
+		}
+		modules = append(modules, &m)
+	}
+	return modules, rows.Err()
+}
+
+func (s *Store) GetModule(id string) (*Module, error) {
+	var m Module
+	err := s.db.QueryRow(`SELECT id, code, name, description, is_active, created_at, updated_at FROM modules WHERE id = $1`, id).
+		Scan(&m.ID, &m.Code, &m.Name, &m.Description, &m.IsActive, &m.CreatedAt, &m.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+func (s *Store) CreateModule(in *Module) (*Module, error) {
+	err := s.db.QueryRow(
+		`INSERT INTO modules (code, name, description, is_active) VALUES ($1, $2, $3, $4) RETURNING id, created_at, updated_at`,
+		in.Code, in.Name, in.Description, in.IsActive,
+	).Scan(&in.ID, &in.CreatedAt, &in.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return in, nil
+}
+
+func (s *Store) UpdateModule(id string, in *Module) (*Module, error) {
+	res, err := s.db.Exec(
+		`UPDATE modules SET code = $1, name = $2, description = $3, is_active = $4, updated_at = now() WHERE id = $5`,
+		in.Code, in.Name, in.Description, in.IsActive, id,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return nil, ErrNotFound
+	}
+	return s.GetModule(id)
+}
+
+func (s *Store) DeleteModule(id string) error {
+	res, err := s.db.Exec(`DELETE FROM modules WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }

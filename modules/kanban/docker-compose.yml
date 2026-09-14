@@ -1,24 +1,24 @@
 services:
-  app-maintenance-frontend:
+  kanban-frontend:
     build:
       context: ./frontend
       args:
-        VITE_BASE: ${APP_MAINTENANCE_VITE_BASE:-/app-maintenance/}
+        VITE_BASE: ${KANBAN_VITE_BASE:-/kanban/}
     networks:
       - app-network
     restart: unless-stopped
 
-  app-maintenance-backend:
+  kanban-backend:
     build:
       context: ./backend
     environment:
-      - PORT=${APP_MAINTENANCE_BACKEND_PORT:-8080}
+      - PORT=${KANBAN_BACKEND_PORT:-8080}
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=${POSTGRES_USER:-bung}
       - DB_PASSWORD=${POSTGRES_PASSWORD:-bung}
       - DB_NAME=${POSTGRES_DB:-bung}
-      - DB_SCHEMA=${APP_MAINTENANCE_DB_SCHEMA:-app_maintenance}
+      - DB_SCHEMA=${KANBAN_DB_SCHEMA:-kanban}
       - DB_SSLMODE=disable
     networks:
       - app-network

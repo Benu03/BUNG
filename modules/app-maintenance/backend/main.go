@@ -12,7 +12,10 @@ func main() {
 		port = "8080"
 	}
 
-	a := &api{store: NewStore()}
+	db := openDB()
+	defer db.Close()
+
+	a := &api{store: NewStore(db)}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /health", a.health)
