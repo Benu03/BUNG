@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 )
 
 type api struct {
@@ -207,11 +208,19 @@ func (a *api) downloadFile(w http.ResponseWriter, r *http.Request) {
 	defer f.Close()
 
 	w.Header().Set("Content-Type", meta.ContentType)
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, meta.Filename))
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, sanitizeHeaderValue(meta.Filename)))
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", meta.Size))
 	if _, err := io.Copy(w, f); err != nil {
 		log.Printf("stream file %s: %v", meta.ID, err)
 	}
+}
+
+// sanitizeHeaderValue strips characters that would break the
+// Content-Disposition header's quoted filename syntax (a stray `"`) or
+// otherwise have no business in a header value - Go's own header writer
+// already neutralizes embedded CR/LF, this just keeps the value tidy.
+func sanitizeHeaderValue(s string) string {
+	return strings.NewReplacer(`"`, "'", "\r", "", "\n", "").Replace(s)
 }
 
 func (a *api) deleteFile(w http.ResponseWriter, r *http.Request) {

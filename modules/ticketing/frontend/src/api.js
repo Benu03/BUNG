@@ -4,9 +4,13 @@
 const API_BASE = `${import.meta.env.BASE_URL}api/`
 
 async function request(path, options = {}) {
+  // FormData (file uploads) must NOT get a manual Content-Type - the
+  // browser sets its own with the correct multipart boundary. Only
+  // JSON-body calls get the default header.
+  const isFormData = options.body instanceof FormData
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers: isFormData ? options.headers : { 'Content-Type': 'application/json', ...options.headers },
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
@@ -24,6 +28,17 @@ export const api = {
   deleteTicket: (id) => request(`tickets/${id}`, { method: 'DELETE' }),
 
   addComment: (ticketId, body) => request(`tickets/${ticketId}/comments`, { method: 'POST', body: JSON.stringify({ body }) }),
+
+  uploadAttachment: (ticketId, file) => {
+    const form = new FormData()
+    form.append('file', file)
+    return request(`tickets/${ticketId}/attachments`, { method: 'POST', body: form })
+  },
+  deleteAttachment: (ticketId, attachmentId) => request(`tickets/${ticketId}/attachments/${attachmentId}`, { method: 'DELETE' }),
+  // Not fetched via JS - handed straight to the browser (<a href>) so it
+  // streams and shows a native download, using the same-origin session
+  // cookie automatically.
+  attachmentDownloadUrl: (ticketId, attachmentId) => `${API_BASE}tickets/${ticketId}/attachments/${attachmentId}/download`,
 
   listUsers: () => request('users'),
 }

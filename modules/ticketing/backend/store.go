@@ -157,6 +157,78 @@ func (s *Store) CreateComment(ticketID, authorID, body string) (*Comment, error)
 	return c, nil
 }
 
+// ---- attachments ----
+
+func (s *Store) ListAttachments(ticketID string) ([]*Attachment, error) {
+	rows, err := s.db.Query(
+		`SELECT id, ticket_id, uploader_id, filename, content_type, size, storage_path, created_at
+		 FROM ticket_attachments WHERE ticket_id = $1 ORDER BY created_at`,
+		ticketID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	attachments := []*Attachment{}
+	for rows.Next() {
+		var a Attachment
+		if err := rows.Scan(&a.ID, &a.TicketID, &a.UploaderID, &a.Filename, &a.ContentType, &a.Size, &a.StoragePath, &a.CreatedAt); err != nil {
+			return nil, err
+		}
+		attachments = append(attachments, &a)
+	}
+	return attachments, rows.Err()
+}
+
+func (s *Store) GetAttachment(id string) (*Attachment, error) {
+	var a Attachment
+	err := s.db.QueryRow(
+		`SELECT id, ticket_id, uploader_id, filename, content_type, size, storage_path, created_at
+		 FROM ticket_attachments WHERE id = $1`, id,
+	).Scan(&a.ID, &a.TicketID, &a.UploaderID, &a.Filename, &a.ContentType, &a.Size, &a.StoragePath, &a.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
+// CreateAttachment reserves a row (storage_path filled with a placeholder
+// until the blob is actually written - see UpdateAttachmentStorage), same
+// two-step pattern as my-storage's CreateFile.
+func (s *Store) CreateAttachment(a *Attachment) (*Attachment, error) {
+	err := s.db.QueryRow(
+		`INSERT INTO ticket_attachments (ticket_id, uploader_id, filename, content_type, size, storage_path)
+		 VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at`,
+		a.TicketID, a.UploaderID, a.Filename, a.ContentType, a.Size, a.StoragePath,
+	).Scan(&a.ID, &a.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
+func (s *Store) UpdateAttachmentStorage(id, storagePath string, size int64) error {
+	_, err := s.db.Exec(`UPDATE ticket_attachments SET storage_path = $1, size = $2 WHERE id = $3`, storagePath, size, id)
+	return err
+}
+
+// DeleteAttachment deletes the metadata row and returns it (so the caller
+// can remove the underlying blob) - or ErrNotFound if it doesn't exist.
+func (s *Store) DeleteAttachment(id string) (*Attachment, error) {
+	a, err := s.GetAttachment(id)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.db.Exec(`DELETE FROM ticket_attachments WHERE id = $1`, id); err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
 // ---- users (cross-schema) ----
 
 // ListAllUsers is a cross-schema read of app-maintenance's user directory,

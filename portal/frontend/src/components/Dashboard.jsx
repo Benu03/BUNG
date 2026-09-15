@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
-import { ArrowRight, Megaphone, PackageOpen, Search, Star } from 'lucide-react'
-import { Button } from './ui/button.jsx'
+import { Megaphone, PackageOpen, Search, Star } from 'lucide-react'
 import { Input } from './ui/input.jsx'
-import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from './ui/card.jsx'
+import { Card } from './ui/card.jsx'
 import { Alert, AlertDescription } from './ui/alert.jsx'
 import Logo from './Logo.jsx'
 import ThemeToggle from './ThemeToggle.jsx'
@@ -152,35 +151,30 @@ export default function Dashboard({ user, onLogout, settings, onChangePassword }
             {t('common.noMatches')}
           </Card>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          // Compact icon-tile grid (Odoo app-launcher style) - the icon
+          // does the identifying, the name is a one-line label underneath,
+          // and the description moves to a hover tooltip instead of taking
+          // up its own line, so far more modules fit on screen at once.
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3 md:grid-cols-5 lg:grid-cols-6">
             {visibleModules.map((m, i) => {
               const isFavorite = favorites.has(m.code)
               return (
-                <a key={m.code} href={`/${m.code}/`} className="group">
-                  <Card className="relative h-full rounded-2xl border-border/60 shadow-sm transition-all duration-200 group-hover:-translate-y-0.5 group-hover:shadow-lg">
+                <a key={m.code} href={`/${m.code}/`} className="group" title={m.description}>
+                  <div className="relative flex flex-col items-center gap-2 rounded-xl px-2 py-3 text-center transition-colors hover:bg-card hover:shadow-sm">
                     <button
                       onClick={(e) => toggleFavorite(m.code, e)}
                       title={t(isFavorite ? 'dashboard.removeFavorite' : 'dashboard.addFavorite')}
-                      className="absolute right-3 top-3 z-10 rounded-full p-1 text-muted-foreground/50 transition-colors hover:bg-muted hover:text-amber-500"
+                      className={`absolute right-0.5 top-0.5 rounded-full p-1 transition-opacity ${
+                        isFavorite ? 'text-amber-500 opacity-100' : 'text-muted-foreground/40 opacity-0 hover:text-amber-500 group-hover:opacity-100'
+                      }`}
                     >
-                      <Star className={`h-4 w-4 ${isFavorite ? 'fill-amber-400 text-amber-500' : ''}`} />
+                      <Star className={`h-3.5 w-3.5 ${isFavorite ? 'fill-amber-400' : ''}`} />
                     </button>
-                    <CardHeader className="gap-3">
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br text-sm font-semibold text-slate-700 ${ICON_GRADIENTS[i % ICON_GRADIENTS.length]}`}>
-                        {initials(m.name)}
-                      </div>
-                      <div>
-                        <CardTitle className="flex items-center justify-between pr-5 text-base">
-                          {m.name}
-                          <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
-                        </CardTitle>
-                        {m.description && <CardDescription className="mt-1">{m.description}</CardDescription>}
-                      </div>
-                    </CardHeader>
-                    <CardFooter>
-                      <span className="text-xs text-muted-foreground">/{m.code}/</span>
-                    </CardFooter>
-                  </Card>
+                    <div className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br text-base font-semibold text-slate-700 shadow-sm transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:shadow-md sm:h-16 sm:w-16 ${ICON_GRADIENTS[i % ICON_GRADIENTS.length]}`}>
+                      {initials(m.name)}
+                    </div>
+                    <span className="line-clamp-2 text-xs font-medium leading-tight text-foreground sm:text-sm">{m.name}</span>
+                  </div>
                 </a>
               )
             })}

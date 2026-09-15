@@ -71,6 +71,12 @@ export default function TicketsPage() {
     })
     setModalTicket(undefined)
   }
+  // Called after the *first* save of a brand-new ticket - unlike onSaved,
+  // this deliberately leaves the modal open (see TicketModal) so the user
+  // can attach files/comment right away, without an extra close-and-reopen.
+  const onCreated = (saved) => {
+    setTickets((prev) => [saved, ...prev])
+  }
   const onDeleted = (id) => {
     setTickets((prev) => prev.filter((tk) => tk.id !== id))
     setModalTicket(undefined)
@@ -168,6 +174,7 @@ export default function TicketsPage() {
           users={users}
           onClose={() => setModalTicket(undefined)}
           onSaved={onSaved}
+          onCreated={onCreated}
           onDeleted={onDeleted}
         />
       )}

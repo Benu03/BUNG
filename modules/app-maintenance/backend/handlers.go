@@ -5,9 +5,18 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"regexp"
 	"strconv"
 	"time"
 )
+
+// validEmail is a deliberately loose sanity check (not full RFC 5322) -
+// its job is just to reject the pathological cases (empty, no "@", or
+// embedded whitespace/control characters like CR/LF) before an address
+// ever reaches forgot-password's outgoing email (see email.go's
+// smtpSender.Send, which interpolates it into raw message text). Real
+// deliverability is whatever the mail relay decides.
+var validEmail = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
 
 type api struct {
 	store *Store
@@ -78,6 +87,10 @@ func (a *api) createUser(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "password must be at least 6 characters")
 		return
 	}
+	if !validEmail.MatchString(in.Email) {
+		writeErr(w, http.StatusBadRequest, "invalid email address")
+		return
+	}
 	hash, err := hashPassword(in.Password)
 	if err != nil {
 		handleErr(w, err)
@@ -122,6 +135,10 @@ func (a *api) updateUser(w http.ResponseWriter, r *http.Request) {
 	var in User
 	if err := decodeJSON(r, &in); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+	if !validEmail.MatchString(in.Email) {
+		writeErr(w, http.StatusBadRequest, "invalid email address")
 		return
 	}
 	u, err := a.store.UpdateUser(r.PathValue("id"), &in)

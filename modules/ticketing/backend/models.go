@@ -28,10 +28,11 @@ type Ticket struct {
 }
 
 // ticketDetail is what GET /tickets/{id} returns - the ticket plus its
-// full comment thread in one round trip.
+// full comment thread and attachments in one round trip.
 type ticketDetail struct {
 	*Ticket
-	Comments []*Comment `json:"comments"`
+	Comments    []*Comment    `json:"comments"`
+	Attachments []*Attachment `json:"attachments"`
 }
 
 type Comment struct {
@@ -40,6 +41,20 @@ type Comment struct {
 	AuthorID  string    `json:"authorId"`
 	Body      string    `json:"body"`
 	CreatedAt time.Time `json:"createdAt"`
+}
+
+// Attachment is one uploaded file (a screenshot, log export, etc.) on a
+// ticket - bytes live on disk (see storage.go), only this row is in
+// Postgres, same split as my-storage's FileMeta.
+type Attachment struct {
+	ID          string    `json:"id"`
+	TicketID    string    `json:"ticketId"`
+	UploaderID  string    `json:"uploaderId"`
+	Filename    string    `json:"filename"`
+	ContentType string    `json:"contentType"`
+	Size        int64     `json:"size"`
+	StoragePath string    `json:"-"` // internal only, never serialized to clients
+	CreatedAt   time.Time `json:"createdAt"`
 }
 
 // UserRef is a minimal, read-only view of an app-maintenance user, used to

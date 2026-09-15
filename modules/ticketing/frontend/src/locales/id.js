@@ -43,6 +43,10 @@ export default {
     statusResolved: 'Selesai',
     statusClosed: 'Ditutup',
     footerHint: 'Antrean bersama - siapa pun yang punya akses Ticketing bisa melihat dan mengelola semua tiket.',
+    attachments: 'Lampiran',
+    addAttachment: 'Tambah file',
+    noAttachments: 'Belum ada lampiran.',
+    confirmDeleteAttachment: 'Hapus lampiran ini?',
   },
   bell: {
     title: 'Notifikasi',

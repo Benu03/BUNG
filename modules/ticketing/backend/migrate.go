@@ -43,6 +43,22 @@ CREATE TABLE IF NOT EXISTS ticket_comments (
 );
 
 CREATE INDEX IF NOT EXISTS ticket_comments_ticket_idx ON ticket_comments (ticket_id, created_at);
+
+-- File attachments (screenshots etc.) on a ticket - bytes live on disk
+-- under this module's own Docker volume (see storage.go), only metadata
+-- here, same split as my-storage's files table.
+CREATE TABLE IF NOT EXISTS ticket_attachments (
+	id UUID PRIMARY KEY DEFAULT public.gen_random_uuid(),
+	ticket_id UUID NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+	uploader_id UUID NOT NULL,
+	filename TEXT NOT NULL,
+	content_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+	size BIGINT NOT NULL DEFAULT 0,
+	storage_path TEXT NOT NULL,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ticket_attachments_ticket_idx ON ticket_attachments (ticket_id);
 `
 
 // migrate creates this module's schema (if missing) and its tables. No

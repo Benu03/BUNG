@@ -106,6 +106,16 @@ func (a *authAPI) signToken(userID, username string, moduleCodes []string, mustC
 func (a *authAPI) parseToken(raw string) (*claims, error) {
 	var c claims
 	token, err := jwt.ParseWithClaims(raw, &c, func(t *jwt.Token) (any, error) {
+		// Pin the expected algorithm before handing back the secret -
+		// not exploitable today (this is a single symmetric secret that's
+		// never exposed anywhere a "confused" verification could hand an
+		// attacker a way in, unlike the classic RS256->HS256 attack where
+		// a public key doubles as an HMAC secret), but a token's alg
+		// should never be trusted without checking it matches what was
+		// actually used to sign - cheap to pin explicitly either way.
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
 		return a.jwtSecret, nil
 	})
 	if err != nil || !token.Valid {
@@ -401,6 +411,20 @@ func (a *authAPI) forgotPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	const genericMsg = "If that account exists, a password reset link has been sent to its email."
+
+	// Reuses the same limiter as login (distinct key prefix so the two
+	// don't share a bucket) - without this, the endpoint could be used to
+	// flood an account's inbox with reset emails, or hammer the SMTP relay,
+	// with no cap at all. Every call counts as a "failure" (there's no
+	// success/fail distinction here) so repeated requests lock out after
+	// maxLoginAttempts within loginWindow, same as login.
+	limitKey := "forgot:" + in.Identifier + "|" + clientIP(r)
+	if blocked, retryAfter := a.limiter.blocked(limitKey); blocked {
+		minutes := int(retryAfter.Minutes()) + 1
+		writeErr(w, http.StatusTooManyRequests, fmt.Sprintf("too many requests, try again in %d minute(s)", minutes))
+		return
+	}
+	a.limiter.recordFailure(limitKey)
 
 	user, _, err := a.store.GetUserByIdentifier(in.Identifier)
 	if err != nil {

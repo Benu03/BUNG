@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Trash2, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { File as FileIcon, Paperclip, Trash2, X } from 'lucide-react'
 import { api } from '../api.js'
 import { Button } from './ui/button.jsx'
 import { Input } from './ui/input.jsx'
@@ -10,12 +10,19 @@ import { useTranslation } from '../lib/i18n.jsx'
 
 const selectClass = 'h-9 rounded-md border border-input bg-background px-2 text-sm'
 
-export default function TicketModal({ ticketId, users, onClose, onSaved, onDeleted }) {
+function formatSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+export default function TicketModal({ ticketId, users, onClose, onSaved, onCreated, onDeleted }) {
   const { t } = useTranslation()
-  const isEdit = !!ticketId
-  const [loading, setLoading] = useState(isEdit)
+  const [loading, setLoading] = useState(!!ticketId)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef(null)
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -26,9 +33,17 @@ export default function TicketModal({ ticketId, users, onClose, onSaved, onDelet
   const [requesterId, setRequesterId] = useState('')
   const [comments, setComments] = useState([])
   const [newComment, setNewComment] = useState('')
+  const [attachments, setAttachments] = useState([])
+
+  // currentId starts null for a brand-new ticket and is set the moment
+  // the first Save succeeds - the modal then switches into edit display
+  // in place (instead of closing) so comments/attachments can be added
+  // right away, same fix as calendar's EventModal.
+  const [currentId, setCurrentId] = useState(ticketId || null)
+  const isEdit = !!currentId
 
   useEffect(() => {
-    if (!isEdit) return
+    if (!ticketId) return
     api.getTicket(ticketId)
       .then((tk) => {
         setTitle(tk.title)
@@ -39,6 +54,7 @@ export default function TicketModal({ ticketId, users, onClose, onSaved, onDelet
         setAssigneeId(tk.assigneeId || '')
         setRequesterId(tk.requesterId)
         setComments(tk.comments || [])
+        setAttachments(tk.attachments || [])
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
@@ -58,10 +74,16 @@ export default function TicketModal({ ticketId, users, onClose, onSaved, onDelet
     }
     setSaving(true)
     try {
-      const saved = isEdit
-        ? await api.updateTicket(ticketId, { title: title.trim(), description, category, priority, status, assigneeId: assigneeId || null })
-        : await api.createTicket({ title: title.trim(), description, category, priority })
-      onSaved(saved)
+      const payload = { title: title.trim(), description, category, priority }
+      if (isEdit) {
+        const saved = await api.updateTicket(currentId, { ...payload, status, assigneeId: assigneeId || null })
+        onSaved(saved)
+      } else {
+        const saved = await api.createTicket(payload)
+        setCurrentId(saved.id)
+        setRequesterId(saved.requesterId)
+        onCreated(saved)
+      }
     } catch (e) {
       setError(e.message)
     } finally {
@@ -72,8 +94,8 @@ export default function TicketModal({ ticketId, users, onClose, onSaved, onDelet
   const remove = async () => {
     if (!confirm(t('tickets.confirmDelete'))) return
     try {
-      await api.deleteTicket(ticketId)
-      onDeleted(ticketId)
+      await api.deleteTicket(currentId)
+      onDeleted(currentId)
     } catch (e) {
       setError(e.message)
     }
@@ -83,9 +105,35 @@ export default function TicketModal({ ticketId, users, onClose, onSaved, onDelet
     e.preventDefault()
     if (!newComment.trim()) return
     try {
-      const c = await api.addComment(ticketId, newComment.trim())
+      const c = await api.addComment(currentId, newComment.trim())
       setComments((prev) => [...prev, c])
       setNewComment('')
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
+  const doUpload = async (fileList) => {
+    if (!fileList || fileList.length === 0) return
+    setError('')
+    setUploading(true)
+    try {
+      for (const file of fileList) {
+        const a = await api.uploadAttachment(currentId, file)
+        setAttachments((prev) => [...prev, a])
+      }
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const removeAttachment = async (attachmentId) => {
+    if (!confirm(t('tickets.confirmDeleteAttachment'))) return
+    try {
+      await api.deleteAttachment(currentId, attachmentId)
+      setAttachments((prev) => prev.filter((a) => a.id !== attachmentId))
     } catch (e) {
       setError(e.message)
     }
@@ -171,6 +219,66 @@ export default function TicketModal({ ticketId, users, onClose, onSaved, onDelet
                 </div>
               </div>
             </form>
+
+            {isEdit && (
+              <div className="border-t px-6 py-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <h4 className="text-sm font-semibold">{t('tickets.attachments')}</h4>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    <Paperclip className="h-3.5 w-3.5" />
+                    {uploading ? t('common.loading') : t('tickets.addAttachment')}
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => doUpload(e.target.files)}
+                  />
+                </div>
+
+                {attachments.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">{t('tickets.noAttachments')}</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {attachments.map((a) => {
+                      const isImage = a.contentType?.startsWith('image/')
+                      const url = api.attachmentDownloadUrl(currentId, a.id)
+                      return (
+                        <div key={a.id} className="group relative overflow-hidden rounded-md border">
+                          <a href={url} target="_blank" rel="noreferrer" className="block" title={a.filename}>
+                            {isImage ? (
+                              <img src={url} alt={a.filename} className="h-20 w-full object-cover" />
+                            ) : (
+                              <div className="flex h-20 w-full flex-col items-center justify-center gap-1 bg-muted/40 px-1 text-center">
+                                <FileIcon className="h-5 w-5 text-muted-foreground" />
+                                <span className="line-clamp-2 text-[10px] text-muted-foreground">{a.filename}</span>
+                              </div>
+                            )}
+                          </a>
+                          <div className="flex items-center justify-between gap-1 bg-card px-1.5 py-1">
+                            <span className="truncate text-[10px] text-muted-foreground">{formatSize(a.size)}</span>
+                            <button
+                              type="button"
+                              onClick={() => removeAttachment(a.id)}
+                              className="rounded p-0.5 text-muted-foreground hover:text-destructive"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
             {isEdit && (
               <div className="border-t px-6 py-4">

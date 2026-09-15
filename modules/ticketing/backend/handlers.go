@@ -4,12 +4,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"strings"
 )
 
 type api struct {
 	store *Store
+	blobs *blobStore
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -71,7 +74,12 @@ func (a *api) get(w http.ResponseWriter, r *http.Request) {
 		handleErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, &ticketDetail{Ticket: t, Comments: comments})
+	attachments, err := a.store.ListAttachments(id)
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, &ticketDetail{Ticket: t, Comments: comments, Attachments: attachments})
 }
 
 func (a *api) create(w http.ResponseWriter, r *http.Request) {
@@ -207,6 +215,107 @@ func (a *api) createComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, c)
+}
+
+// ---- attachments ----
+
+// uploadAttachment accepts a single multipart file under field name
+// "file" - images (screenshots) are the main use case, but any file type
+// is accepted, same as my-storage. nginx's client_max_body_size (see
+// /nginx/nginx.conf) caps upload size.
+func (a *api) uploadAttachment(w http.ResponseWriter, r *http.Request) {
+	ticketID := r.PathValue("id")
+	if _, err := a.store.Get(ticketID); err != nil {
+		handleErr(w, err)
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "missing file field")
+		return
+	}
+	defer file.Close()
+
+	filename := header.Filename
+	if filename == "" {
+		filename = "unnamed"
+	}
+	contentType := header.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	// Reserve the row first to get an id, then write bytes under that id -
+	// keeps the on-disk path collision-proof without a second query, same
+	// pattern as my-storage's uploadFile.
+	created, err := a.store.CreateAttachment(&Attachment{
+		TicketID: ticketID, UploaderID: currentUserID(r), Filename: filename, ContentType: contentType, StoragePath: "pending",
+	})
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+
+	path, size, err := a.blobs.Save(ticketID, created.ID, file)
+	if err != nil {
+		_, _ = a.store.DeleteAttachment(created.ID)
+		handleErr(w, err)
+		return
+	}
+	created.StoragePath = path
+	created.Size = size
+
+	if err := a.store.UpdateAttachmentStorage(created.ID, path, size); err != nil {
+		handleErr(w, err)
+		return
+	}
+
+	writeAudit(a.store.db, r, "ticket.attachment_upload", "ticket", ticketID, map[string]any{"filename": created.Filename, "size": size})
+	writeJSON(w, http.StatusCreated, created)
+}
+
+func (a *api) downloadAttachment(w http.ResponseWriter, r *http.Request) {
+	meta, err := a.store.GetAttachment(r.PathValue("attachmentId"))
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+
+	f, err := a.blobs.Open(meta.StoragePath)
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+	defer f.Close()
+
+	w.Header().Set("Content-Type", meta.ContentType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, sanitizeHeaderValue(meta.Filename)))
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", meta.Size))
+	if _, err := io.Copy(w, f); err != nil {
+		log.Printf("stream attachment %s: %v", meta.ID, err)
+	}
+}
+
+func (a *api) deleteAttachment(w http.ResponseWriter, r *http.Request) {
+	meta, err := a.store.DeleteAttachment(r.PathValue("attachmentId"))
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+	if err := a.blobs.Delete(meta.StoragePath); err != nil {
+		log.Printf("delete blob for attachment %s: %v", meta.ID, err)
+	}
+	writeAudit(a.store.db, r, "ticket.attachment_delete", "ticket", meta.TicketID, map[string]any{"filename": meta.Filename})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// sanitizeHeaderValue strips characters that would break the
+// Content-Disposition header's quoted filename syntax (a stray `"`) or
+// otherwise have no business in a header value - Go's own header writer
+// already neutralizes embedded CR/LF, this just keeps the value tidy.
+func sanitizeHeaderValue(s string) string {
+	return strings.NewReplacer(`"`, "'", "\r", "", "\n", "").Replace(s)
 }
 
 // ---- users ----

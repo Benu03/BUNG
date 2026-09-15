@@ -20,6 +20,9 @@ services:
       - DB_NAME=${POSTGRES_DB:-bung}
       - DB_SCHEMA=${TICKETING_DB_SCHEMA:-ticketing}
       - DB_SSLMODE=disable
+      - DATA_DIR=/data
+    volumes:
+      - ticketing-data:/data
     networks:
       - app-network
     depends_on:
@@ -34,3 +37,6 @@ services:
       notifications-backend:
         condition: service_started
     restart: unless-stopped
+
+volumes:
+  ticketing-data:

@@ -43,6 +43,10 @@ export default {
     statusResolved: 'Resolved',
     statusClosed: 'Closed',
     footerHint: 'Shared queue - everyone with access to Ticketing can see and manage every ticket.',
+    attachments: 'Attachments',
+    addAttachment: 'Add file',
+    noAttachments: 'No attachments yet.',
+    confirmDeleteAttachment: 'Delete this attachment?',
   },
   bell: {
     title: 'Notifications',
