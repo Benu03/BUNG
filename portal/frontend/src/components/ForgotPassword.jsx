@@ -6,8 +6,10 @@ import { Label } from './ui/label.jsx'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './ui/card.jsx'
 import { Alert, AlertDescription } from './ui/alert.jsx'
 import Logo from './Logo.jsx'
+import { useTranslation } from '../lib/i18n.jsx'
 
 export default function ForgotPassword({ onBack }) {
+  const { t } = useTranslation()
   const [identifier, setIdentifier] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -39,25 +41,23 @@ export default function ForgotPassword({ onBack }) {
         <div className="mb-7 flex flex-col items-center gap-3 text-center">
           <Logo className="h-12 w-12" />
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">Reset your password</h1>
-            <p className="text-sm text-muted-foreground">Enter your username or email to get a reset link</p>
+            <h1 className="text-xl font-semibold tracking-tight">{t('forgotPassword.title')}</h1>
+            <p className="text-sm text-muted-foreground">{t('forgotPassword.subtitle')}</p>
           </div>
         </div>
 
         <Card className="rounded-2xl shadow-xl shadow-black/5">
           <CardHeader>
-            <CardTitle className="text-base">Forgot password</CardTitle>
-            <CardDescription>We'll email you a link to set a new password.</CardDescription>
+            <CardTitle className="text-base">{t('forgotPassword.heading')}</CardTitle>
+            <CardDescription>{t('forgotPassword.description')}</CardDescription>
           </CardHeader>
           {sent ? (
             <CardContent className="flex flex-col items-center gap-3 py-6 text-center">
               <MailCheck className="h-8 w-8 text-emerald-600" />
-              <p className="text-sm text-muted-foreground">
-                If that account exists, a reset link has been sent to its email. It's valid for 1 hour.
-              </p>
+              <p className="text-sm text-muted-foreground">{t('forgotPassword.sentMessage')}</p>
               <Button variant="outline" onClick={onBack} className="mt-2">
                 <ArrowLeft />
-                Back to sign in
+                {t('forgotPassword.backToSignIn')}
               </Button>
             </CardContent>
           ) : (
@@ -70,7 +70,7 @@ export default function ForgotPassword({ onBack }) {
                   </Alert>
                 )}
                 <div className="grid gap-2">
-                  <Label htmlFor="identifier">Username or email</Label>
+                  <Label htmlFor="identifier">{t('forgotPassword.usernameOrEmail')}</Label>
                   <Input id="identifier" autoFocus required value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)} />
                 </div>
@@ -78,11 +78,11 @@ export default function ForgotPassword({ onBack }) {
               <CardFooter className="flex-col gap-3">
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading && <LoaderCircle className="animate-spin" />}
-                  Send reset link
+                  {t('forgotPassword.sendLink')}
                 </Button>
                 <Button type="button" variant="ghost" className="w-full" onClick={onBack}>
                   <ArrowLeft />
-                  Back to sign in
+                  {t('forgotPassword.backToSignIn')}
                 </Button>
               </CardFooter>
             </form>

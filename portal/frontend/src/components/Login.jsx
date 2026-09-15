@@ -7,8 +7,11 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Alert, AlertDescription } from './ui/alert.jsx'
 import Logo from './Logo.jsx'
 import ThemeToggle from './ThemeToggle.jsx'
+import LanguageToggle from './LanguageToggle.jsx'
+import { useTranslation } from '../lib/i18n.jsx'
 
 export default function Login({ onLoggedIn, notice, settings, onForgotPassword }) {
+  const { t } = useTranslation()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -42,7 +45,10 @@ export default function Login({ onLoggedIn, notice, settings, onForgotPassword }
         <div className="absolute -bottom-40 right-1/4 h-72 w-72 rounded-full bg-primary-dark/15 blur-3xl" />
       </div>
 
-      <ThemeToggle className="absolute right-4 top-4 z-10 text-muted-foreground" />
+      <div className="absolute right-4 top-4 z-10 flex items-center gap-1">
+        <LanguageToggle className="text-muted-foreground" />
+        <ThemeToggle className="text-muted-foreground" />
+      </div>
 
       <div className="relative z-10 w-full max-w-sm">
         <div className="mb-7 flex flex-col items-center gap-3 text-center">
@@ -55,8 +61,8 @@ export default function Login({ onLoggedIn, notice, settings, onForgotPassword }
 
         <Card className="rounded-2xl border-border/60 shadow-xl shadow-black/5 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle className="text-base">Sign in</CardTitle>
-            <CardDescription>Enter your credentials to continue</CardDescription>
+            <CardTitle className="text-base">{t('login.signIn')}</CardTitle>
+            <CardDescription>{t('login.enterCredentials')}</CardDescription>
           </CardHeader>
           <form onSubmit={submit}>
             <CardContent className="flex flex-col gap-4">
@@ -73,7 +79,7 @@ export default function Login({ onLoggedIn, notice, settings, onForgotPassword }
                 </Alert>
               )}
               <div className="grid gap-2">
-                <Label htmlFor="username">Username</Label>
+                <Label htmlFor="username">{t('login.username')}</Label>
                 <Input
                   id="username"
                   autoFocus
@@ -86,9 +92,9 @@ export default function Login({ onLoggedIn, notice, settings, onForgotPassword }
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">{t('login.password')}</Label>
                   <button type="button" onClick={onForgotPassword} className="text-xs text-muted-foreground hover:text-foreground hover:underline">
-                    Forgot password?
+                    {t('login.forgotPassword')}
                   </button>
                 </div>
                 <Input
@@ -105,10 +111,10 @@ export default function Login({ onLoggedIn, notice, settings, onForgotPassword }
             <CardFooter className="flex-col gap-3">
               <Button type="submit" className="h-10 w-full rounded-lg bg-gradient-to-r from-primary to-primary-dark shadow-md shadow-primary/20 hover:opacity-95" disabled={loading}>
                 {loading && <LoaderCircle className="animate-spin" />}
-                Sign in
+                {t('login.signInButton')}
               </Button>
               <p className="text-center text-xs text-muted-foreground">
-                Default admin: <span className="font-mono">admin</span> / <span className="font-mono">admin123</span>
+                {t('login.defaultAdmin')}: <span className="font-mono">admin</span> / <span className="font-mono">admin123</span>
               </p>
             </CardFooter>
           </form>

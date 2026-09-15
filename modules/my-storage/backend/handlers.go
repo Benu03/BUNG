@@ -24,6 +24,11 @@ func writeErr(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
+func decodeJSON(r *http.Request, v any) error {
+	defer r.Body.Close()
+	return json.NewDecoder(r.Body).Decode(v)
+}
+
 func handleErr(w http.ResponseWriter, err error) {
 	if errors.Is(err, ErrNotFound) {
 		writeErr(w, http.StatusNotFound, "not found")
@@ -45,17 +50,98 @@ func (a *api) health(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "module": "my-storage"})
 }
 
-func (a *api) listFiles(w http.ResponseWriter, r *http.Request) {
-	files, err := a.store.ListFiles(currentUserID(r))
+// browse returns one folder's contents (its subfolders + files) plus a
+// breadcrumb trail, in one request - ?folderId= omitted or empty means
+// the root folder.
+func (a *api) browse(w http.ResponseWriter, r *http.Request) {
+	userID := currentUserID(r)
+	folderID := r.URL.Query().Get("folderId")
+
+	resp := &BrowseResponse{Breadcrumb: []BreadcrumbEntry{}}
+
+	if folderID != "" {
+		folder, err := a.store.GetFolder(userID, folderID)
+		if err != nil {
+			handleErr(w, err)
+			return
+		}
+		resp.Folder = folder
+
+		breadcrumb, err := a.store.Breadcrumb(userID, folderID)
+		if err != nil {
+			handleErr(w, err)
+			return
+		}
+		resp.Breadcrumb = breadcrumb
+	}
+
+	folders, err := a.store.ListFolders(userID, folderID)
 	if err != nil {
 		handleErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, files)
+	resp.Folders = folders
+
+	files, err := a.store.ListFiles(userID, folderID)
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+	resp.Files = files
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
-// uploadFile accepts a single multipart file under field name "file".
-// nginx's client_max_body_size (see /nginx/nginx.conf) caps upload size.
+func (a *api) createFolder(w http.ResponseWriter, r *http.Request) {
+	var in createFolderRequest
+	if err := decodeJSON(r, &in); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+	if in.Name == "" {
+		writeErr(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	userID := currentUserID(r)
+	f, err := a.store.CreateFolder(userID, in.ParentID, in.Name)
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+	writeAudit(a.store.db, r, "folder.create", "folder", f.ID, map[string]any{"name": f.Name})
+	writeJSON(w, http.StatusCreated, f)
+}
+
+// deleteFolder removes a folder, all its descendant folders, and all
+// files anywhere under it - the on-disk blobs are removed first (the
+// database's ON DELETE CASCADE only removes rows, not files on disk).
+func (a *api) deleteFolder(w http.ResponseWriter, r *http.Request) {
+	userID := currentUserID(r)
+	id := r.PathValue("id")
+
+	files, err := a.store.ListFilesUnder(userID, id)
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+	for _, f := range files {
+		if err := a.blobs.Delete(f.StoragePath); err != nil {
+			log.Printf("delete blob for file %s: %v", f.ID, err)
+		}
+	}
+
+	if err := a.store.DeleteFolder(userID, id); err != nil {
+		handleErr(w, err)
+		return
+	}
+	writeAudit(a.store.db, r, "folder.delete", "folder", id, map[string]any{"filesRemoved": len(files)})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// uploadFile accepts a single multipart file under field name "file", and
+// an optional "folderId" field placing it inside that folder (omitted or
+// empty = root). nginx's client_max_body_size (see /nginx/nginx.conf) caps
+// upload size.
 func (a *api) uploadFile(w http.ResponseWriter, r *http.Request) {
 	userID := currentUserID(r)
 
@@ -65,6 +151,8 @@ func (a *api) uploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
+
+	folderID := r.FormValue("folderId")
 
 	filename := header.Filename
 	if filename == "" {
@@ -78,7 +166,7 @@ func (a *api) uploadFile(w http.ResponseWriter, r *http.Request) {
 	// Reserve the row first to get an id, then write bytes under that id -
 	// keeps the on-disk path collision-proof without a second query.
 	// storage_path is filled in below once we know it.
-	created, err := a.store.CreateFile(&FileMeta{OwnerID: userID, Filename: filename, ContentType: contentType, StoragePath: "pending"})
+	created, err := a.store.CreateFile(&FileMeta{OwnerID: userID, FolderID: folderID, Filename: filename, ContentType: contentType, StoragePath: "pending"})
 	if err != nil {
 		handleErr(w, err)
 		return

@@ -21,8 +21,14 @@ func main() {
 
 	mux.HandleFunc("GET /health", a.health)
 
-	mux.HandleFunc("GET /files", a.listFiles)
-	mux.HandleFunc("POST /files", a.uploadFile)
+	// browse?folderId= (omitted/empty = root) returns that folder's
+	// subfolders + files + breadcrumb in one call.
+	mux.HandleFunc("GET /browse", a.browse)
+
+	mux.HandleFunc("POST /folders", a.createFolder)
+	mux.HandleFunc("DELETE /folders/{id}", a.deleteFolder)
+
+	mux.HandleFunc("POST /files", a.uploadFile) // multipart: file, optional folderId
 	mux.HandleFunc("GET /files/{id}/download", a.downloadFile)
 	mux.HandleFunc("DELETE /files/{id}", a.deleteFile)
 

@@ -45,14 +45,20 @@ CREATE TABLE IF NOT EXISTS files (
 );
 
 CREATE INDEX IF NOT EXISTS files_owner_id_idx ON files (owner_id);
-CREATE INDEX IF NOT EXISTS files_folder_id_idx ON files (folder_id);
 `
 
 // alterSQL patches tables that already existed from an earlier version of
 // this schema. See the identical pattern (and rationale) in
 // app-maintenance's migrate.go.
+//
+// files_folder_id_idx lives here, not in schemaSQL, on purpose: on an
+// existing deployment (files table already present, no folder_id yet),
+// schemaSQL's CREATE TABLE is a no-op and folder_id doesn't exist until
+// the ALTER TABLE below runs - an index statement referencing it would
+// fail if it ran any earlier than this.
 const alterSQL = `
 ALTER TABLE files ADD COLUMN IF NOT EXISTS folder_id UUID REFERENCES folders(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS files_folder_id_idx ON files (folder_id);
 `
 
 // migrate creates this module's schema (if missing) and its tables. No

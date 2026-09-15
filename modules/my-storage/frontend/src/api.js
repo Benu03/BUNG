@@ -14,11 +14,18 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  listFiles: () => request('files'),
+  // Returns { folder, breadcrumb, folders, files } for one folder
+  // (folderId omitted/empty = root).
+  browse: (folderId) => request(`browse${folderId ? `?folderId=${folderId}` : ''}`),
 
-  uploadFile: (file) => {
+  createFolder: (name, parentId) =>
+    request('folders', { method: 'POST', body: JSON.stringify({ name, parentId: parentId || '' }) }),
+  deleteFolder: (id) => request(`folders/${id}`, { method: 'DELETE' }),
+
+  uploadFile: (file, folderId) => {
     const form = new FormData()
     form.append('file', file)
+    if (folderId) form.append('folderId', folderId)
     return request('files', { method: 'POST', body: form })
   },
 

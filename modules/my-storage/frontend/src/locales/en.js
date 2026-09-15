@@ -1,0 +1,32 @@
+export default {
+  common: {
+    portal: 'Portal',
+    logout: 'Logout',
+    cancel: 'Cancel',
+    delete: 'Delete',
+    filterPlaceholder: 'Filter...',
+    noMatches: 'No matches for your filter.',
+  },
+  header: {
+    title: 'My Storage',
+    subtitle: 'Your private files',
+  },
+  fileList: {
+    home: 'My Storage',
+    newFolder: 'New folder',
+    upload: 'Upload',
+    folderNamePlaceholder: 'Folder name',
+    create: 'Create',
+    dropHint: 'Click to upload, or drag files here',
+    privateHint: 'Only visible to you - private per account',
+    colName: 'Name',
+    colType: 'Type',
+    colSize: 'Size',
+    colCreated: 'Created',
+    typeFolder: 'Folder',
+    empty: 'Empty - create a folder or upload a file to get started.',
+    footerHint: 'Only visible to you - private per account. Drag & drop files anywhere on the list to upload here.',
+    confirmDeleteFolder: 'Delete this folder and everything inside it?',
+    confirmDeleteFile: 'Delete this file?',
+  },
+}

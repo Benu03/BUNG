@@ -1,20 +1,23 @@
 import { useEffect, useState } from 'react'
-import { GripVertical, LayoutGrid, Plus, Trash2, TriangleAlert, X } from 'lucide-react'
+import { GripVertical, LayoutGrid, Plus, Search, Trash2, TriangleAlert, X } from 'lucide-react'
 import { api } from '../api.js'
 import { Button } from './ui/button.jsx'
 import { Input } from './ui/input.jsx'
 import { Label } from './ui/label.jsx'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.jsx'
 import { Alert, AlertDescription } from './ui/alert.jsx'
+import { useTranslation } from '../lib/i18n.jsx'
 
 const DEFAULT_COLUMNS = ['To Do', 'In Progress', 'Done']
 
 export default function BoardList({ onOpen }) {
+  const { t } = useTranslation()
   const [boards, setBoards] = useState([])
   const [error, setError] = useState('')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [columns, setColumns] = useState(DEFAULT_COLUMNS)
+  const [filter, setFilter] = useState('')
 
   const load = () => api.listBoards().then(setBoards).catch((e) => setError(e.message))
 
@@ -41,10 +44,15 @@ export default function BoardList({ onOpen }) {
 
   const remove = async (id, e) => {
     e.stopPropagation()
-    if (!confirm('Delete this board and everything in it?')) return
+    if (!confirm(t('boardList.confirmDelete'))) return
     await api.deleteBoard(id)
     load()
   }
+
+  const q = filter.trim().toLowerCase()
+  const filteredBoards = q
+    ? boards.filter((b) => [b.name, b.description].some((v) => v?.toLowerCase().includes(q)))
+    : boards
 
   return (
     <div className="flex flex-col gap-6">
@@ -57,30 +65,30 @@ export default function BoardList({ onOpen }) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Create a board</CardTitle>
+          <CardTitle className="text-base">{t('boardList.createBoard')}</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={submit} className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="grid gap-1.5">
-                <Label htmlFor="b-name">Board name</Label>
+                <Label htmlFor="b-name">{t('boardList.boardName')}</Label>
                 <Input id="b-name" required value={name} onChange={(e) => setName(e.target.value)} />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="b-desc">Description</Label>
-                <Input id="b-desc" placeholder="optional" value={description} onChange={(e) => setDescription(e.target.value)} />
+                <Label htmlFor="b-desc">{t('boardList.description')}</Label>
+                <Input id="b-desc" placeholder={t('common.optional')} value={description} onChange={(e) => setDescription(e.target.value)} />
               </div>
             </div>
 
             <div className="grid gap-1.5">
-              <Label>Workflow (columns)</Label>
+              <Label>{t('boardList.workflow')}</Label>
               <div className="flex flex-col gap-2">
                 {columns.map((c, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <Input
                       value={c}
-                      placeholder={`Stage ${i + 1}`}
+                      placeholder={t('boardList.stagePlaceholder').replace('{n}', i + 1)}
                       onChange={(e) => updateColumn(i, e.target.value)}
                       className="h-8"
                     />
@@ -92,27 +100,39 @@ export default function BoardList({ onOpen }) {
               </div>
               <Button type="button" variant="outline" size="sm" className="self-start" onClick={addColumnField}>
                 <Plus />
-                Add stage
+                {t('boardList.addStage')}
               </Button>
-              <p className="text-xs text-muted-foreground">Define the stages this board's cards move through - you can still add, rename or remove them later.</p>
+              <p className="text-xs text-muted-foreground">{t('boardList.workflowHint')}</p>
             </div>
 
             <Button type="submit" className="self-start">
               <Plus />
-              Create board
+              {t('boardList.createButton')}
             </Button>
           </form>
         </CardContent>
       </Card>
 
-      {boards.length === 0 ? (
+      {boards.length > 0 && (
+        <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder={t('common.filterPlaceholder')}
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="h-8 max-w-xs border-0 shadow-none focus-visible:ring-0"
+          />
+        </div>
+      )}
+
+      {filteredBoards.length === 0 ? (
         <Card className="flex flex-col items-center gap-2 border-dashed py-16 text-center">
           <LayoutGrid className="h-8 w-8 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">No boards yet - create one above.</p>
+          <p className="text-sm text-muted-foreground">{boards.length === 0 ? t('boardList.noBoards') : t('common.noMatches')}</p>
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {boards.map((b) => (
+          {filteredBoards.map((b) => (
             <Card key={b.id} onClick={() => onOpen(b.id)} className="cursor-pointer transition-colors hover:border-foreground/30">
               <CardHeader>
                 <CardTitle className="text-base">{b.name}</CardTitle>
@@ -121,7 +141,7 @@ export default function BoardList({ onOpen }) {
               <CardContent>
                 <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={(e) => remove(b.id, e)}>
                   <Trash2 />
-                  Delete
+                  {t('common.delete')}
                 </Button>
               </CardContent>
             </Card>

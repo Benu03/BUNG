@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { KeyRound, Plus, ShieldCheck, Trash2, TriangleAlert } from 'lucide-react'
+import { KeyRound, Plus, Search, ShieldCheck, Trash2, TriangleAlert } from 'lucide-react'
 import { api } from '../api.js'
 import { Button } from './ui/button.jsx'
 import { Input } from './ui/input.jsx'
@@ -8,8 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card.jsx'
 import { Alert, AlertDescription } from './ui/alert.jsx'
 import { Badge } from './ui/badge.jsx'
 import { cn } from '../lib/utils.js'
+import { useTranslation } from '../lib/i18n.jsx'
 
 export default function Users() {
+  const { t } = useTranslation()
   const [users, setUsers] = useState([])
   const [roles, setRoles] = useState([])
   const [modules, setModules] = useState([])
@@ -18,6 +20,7 @@ export default function Users() {
   const [panel, setPanel] = useState(null) // { userId, mode: 'roles' | 'password' }
   const [assignModuleId, setAssignModuleId] = useState('')
   const [passwordInput, setPasswordInput] = useState('')
+  const [filter, setFilter] = useState('')
 
   const load = () => Promise.all([api.listUsers(), api.listRoles(), api.listModules()])
     .then(([u, r, m]) => { setUsers(u); setRoles(r); setModules(m) })
@@ -38,7 +41,7 @@ export default function Users() {
   }
 
   const remove = async (id) => {
-    if (!confirm('Delete this user?')) return
+    if (!confirm(t('users.confirmDelete'))) return
     await api.deleteUser(id)
     load()
   }
@@ -71,6 +74,11 @@ export default function Users() {
   const moduleName = (id) => modules.find((m) => m.id === id)?.name || id
   const rolesForModule = (moduleId) => roles.filter((r) => r.moduleId === moduleId)
 
+  const q = filter.trim().toLowerCase()
+  const filteredUsers = q
+    ? users.filter((u) => [u.username, u.fullName, u.email].some((v) => v?.toLowerCase().includes(q)))
+    : users
+
   return (
     <div className="flex flex-col gap-6">
       {error && (
@@ -82,52 +90,61 @@ export default function Users() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Add user</CardTitle>
+          <CardTitle className="text-base">{t('users.addUser')}</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={submit} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
             <div className="grid gap-1.5">
-              <Label htmlFor="u-username">Username</Label>
+              <Label htmlFor="u-username">{t('users.username')}</Label>
               <Input id="u-username" required value={form.username}
                 onChange={(e) => setForm({ ...form, username: e.target.value })} />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="u-fullname">Full name</Label>
+              <Label htmlFor="u-fullname">{t('users.fullName')}</Label>
               <Input id="u-fullname" required value={form.fullName}
                 onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="u-email">Email</Label>
+              <Label htmlFor="u-email">{t('users.email')}</Label>
               <Input id="u-email" type="email" required value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })} />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="u-password">Password</Label>
-              <Input id="u-password" type="password" required minLength={6} placeholder="min 6 chars"
+              <Label htmlFor="u-password">{t('users.password')}</Label>
+              <Input id="u-password" type="password" required minLength={6} placeholder={t('users.passwordHint')}
                 value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
             </div>
             <Button type="submit">
               <Plus />
-              Add user
+              {t('users.addUserButton')}
             </Button>
           </form>
         </CardContent>
       </Card>
 
       <Card>
+        <div className="flex items-center gap-2 border-b p-3">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder={t('common.filterPlaceholder')}
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="h-8 max-w-xs border-0 shadow-none focus-visible:ring-0"
+          />
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="px-4 py-3 font-medium">Username</th>
-                <th className="px-4 py-3 font-medium">Full name</th>
-                <th className="px-4 py-3 font-medium">Email</th>
-                <th className="px-4 py-3 font-medium">Roles</th>
+                <th className="px-4 py-3 font-medium">{t('users.colUsername')}</th>
+                <th className="px-4 py-3 font-medium">{t('users.colFullName')}</th>
+                <th className="px-4 py-3 font-medium">{t('users.colEmail')}</th>
+                <th className="px-4 py-3 font-medium">{t('users.colRoles')}</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => {
+              {filteredUsers.map((u) => {
                 const isRolesOpen = panel?.userId === u.id && panel.mode === 'roles'
                 const isPasswordOpen = panel?.userId === u.id && panel.mode === 'password'
                 const roleIdsInModule = rolesForModule(assignModuleId).map((r) => r.id)
@@ -143,13 +160,13 @@ export default function Users() {
                             {roleName(id)}
                           </Badge>
                         ))}
-                        {u.roleIds.length === 0 && <span className="text-xs text-muted-foreground">No roles</span>}
+                        {u.roleIds.length === 0 && <span className="text-xs text-muted-foreground">{t('users.noRolesBadge')}</span>}
                       </div>
 
                       {isRolesOpen && (
                         <div className="mt-2 flex flex-col gap-2 rounded-md border bg-muted/30 p-2.5">
                           <div className="grid gap-1">
-                            <Label htmlFor="assign-module" className="text-xs text-muted-foreground">1. Pick a module</Label>
+                            <Label htmlFor="assign-module" className="text-xs text-muted-foreground">{t('users.pickModuleStep')}</Label>
                             <select
                               id="assign-module"
                               value={assignModuleId}
@@ -160,10 +177,10 @@ export default function Users() {
                             </select>
                           </div>
                           <div className="grid gap-1">
-                            <span className="text-xs text-muted-foreground">2. Toggle role(s) in this module</span>
+                            <span className="text-xs text-muted-foreground">{t('users.toggleRoleStep')}</span>
                             <div className="flex flex-wrap gap-2">
                               {roleIdsInModule.length === 0 && (
-                                <span className="text-xs text-muted-foreground">No roles defined for this module yet.</span>
+                                <span className="text-xs text-muted-foreground">{t('users.noRolesForModule')}</span>
                               )}
                               {rolesForModule(assignModuleId).map((r) => {
                                 const selected = u.roleIds.includes(r.id)
@@ -184,7 +201,7 @@ export default function Users() {
                                 )
                               })}
                             </div>
-                            <span className="text-[11px] text-muted-foreground">A user can hold more than one role within the same module.</span>
+                            <span className="text-[11px] text-muted-foreground">{t('users.multiRoleHint')}</span>
                           </div>
                         </div>
                       )}
@@ -194,13 +211,13 @@ export default function Users() {
                           <Input
                             type="password"
                             autoFocus
-                            placeholder="New password"
+                            placeholder={t('users.newPassword')}
                             className="h-8 max-w-48"
                             value={passwordInput}
                             onChange={(e) => setPasswordInput(e.target.value)}
                           />
-                          <Button size="sm" onClick={() => submitPassword(u.id)}>Save</Button>
-                          <Button size="sm" variant="ghost" onClick={() => { setPanel(null); setPasswordInput('') }}>Cancel</Button>
+                          <Button size="sm" onClick={() => submitPassword(u.id)}>{t('users.saveButton')}</Button>
+                          <Button size="sm" variant="ghost" onClick={() => { setPanel(null); setPasswordInput('') }}>{t('users.cancelButton')}</Button>
                         </div>
                       )}
                     </td>
@@ -208,19 +225,19 @@ export default function Users() {
                       <div className="flex justify-end gap-1">
                         <Button
                           variant="ghost" size="icon"
-                          title="Assign roles"
+                          title={t('users.assignRoles')}
                           onClick={() => (isRolesOpen ? setPanel(null) : openAssign(u.id))}
                         >
                           <ShieldCheck className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost" size="icon"
-                          title="Set password"
+                          title={t('users.setPassword')}
                           onClick={() => { setPanel(isPasswordOpen ? null : { userId: u.id, mode: 'password' }); setPasswordInput('') }}
                         >
                           <KeyRound className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" title="Delete" onClick={() => remove(u.id)}>
+                        <Button variant="ghost" size="icon" title={t('users.deleteTitle')} onClick={() => remove(u.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
@@ -228,9 +245,11 @@ export default function Users() {
                   </tr>
                 )
               })}
-              {users.length === 0 && (
+              {filteredUsers.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No users yet.</td>
+                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                    {users.length === 0 ? t('users.noUsers') : t('common.noMatches')}
+                  </td>
                 </tr>
               )}
             </tbody>

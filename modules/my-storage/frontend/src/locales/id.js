@@ -1,0 +1,32 @@
+export default {
+  common: {
+    portal: 'Portal',
+    logout: 'Keluar',
+    cancel: 'Batal',
+    delete: 'Hapus',
+    filterPlaceholder: 'Filter...',
+    noMatches: 'Tidak ada yang cocok dengan filter.',
+  },
+  header: {
+    title: 'My Storage',
+    subtitle: 'File pribadi kamu',
+  },
+  fileList: {
+    home: 'My Storage',
+    newFolder: 'Folder baru',
+    upload: 'Unggah',
+    folderNamePlaceholder: 'Nama folder',
+    create: 'Buat',
+    dropHint: 'Klik untuk unggah, atau seret file ke sini',
+    privateHint: 'Hanya bisa dilihat oleh kamu - privat per akun',
+    colName: 'Nama',
+    colType: 'Tipe',
+    colSize: 'Ukuran',
+    colCreated: 'Dibuat',
+    typeFolder: 'Folder',
+    empty: 'Kosong - buat folder atau unggah file untuk memulai.',
+    footerHint: 'Hanya bisa dilihat oleh kamu - privat per akun. Seret & lepas file ke mana saja di daftar ini untuk mengunggah ke sini.',
+    confirmDeleteFolder: 'Hapus folder ini beserta isinya?',
+    confirmDeleteFile: 'Hapus file ini?',
+  },
+}

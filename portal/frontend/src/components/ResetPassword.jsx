@@ -6,8 +6,10 @@ import { Label } from './ui/label.jsx'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './ui/card.jsx'
 import { Alert, AlertDescription } from './ui/alert.jsx'
 import Logo from './Logo.jsx'
+import { useTranslation } from '../lib/i18n.jsx'
 
 export default function ResetPassword({ token, onDone }) {
+  const { t } = useTranslation()
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
@@ -18,7 +20,7 @@ export default function ResetPassword({ token, onDone }) {
     e.preventDefault()
     setError('')
     if (password !== confirm) {
-      setError('Passwords do not match.')
+      setError(t('resetPassword.passwordsDontMatch'))
       return
     }
     setLoading(true)
@@ -44,7 +46,7 @@ export default function ResetPassword({ token, onDone }) {
         <div className="mb-7 flex flex-col items-center gap-3 text-center">
           <Logo className="h-12 w-12" />
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">Set a new password</h1>
+            <h1 className="text-xl font-semibold tracking-tight">{t('resetPassword.title')}</h1>
           </div>
         </div>
 
@@ -52,14 +54,14 @@ export default function ResetPassword({ token, onDone }) {
           {done ? (
             <CardContent className="flex flex-col items-center gap-3 py-6 text-center">
               <CheckCircle2 className="h-8 w-8 text-emerald-600" />
-              <p className="text-sm text-muted-foreground">Your password has been updated.</p>
-              <Button onClick={onDone} className="mt-2">Go to sign in</Button>
+              <p className="text-sm text-muted-foreground">{t('resetPassword.success')}</p>
+              <Button onClick={onDone} className="mt-2">{t('resetPassword.goToSignIn')}</Button>
             </CardContent>
           ) : (
             <form onSubmit={submit}>
               <CardHeader>
-                <CardTitle className="text-base">New password</CardTitle>
-                <CardDescription>This link is single-use and expires after 1 hour.</CardDescription>
+                <CardTitle className="text-base">{t('resetPassword.heading')}</CardTitle>
+                <CardDescription>{t('resetPassword.description')}</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
                 {error && (
@@ -69,12 +71,12 @@ export default function ResetPassword({ token, onDone }) {
                   </Alert>
                 )}
                 <div className="grid gap-2">
-                  <Label htmlFor="new-password">New password</Label>
+                  <Label htmlFor="new-password">{t('resetPassword.newPassword')}</Label>
                   <Input id="new-password" type="password" autoFocus required minLength={6}
                     value={password} onChange={(e) => setPassword(e.target.value)} />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="confirm-password">Confirm password</Label>
+                  <Label htmlFor="confirm-password">{t('resetPassword.confirmPassword')}</Label>
                   <Input id="confirm-password" type="password" required minLength={6}
                     value={confirm} onChange={(e) => setConfirm(e.target.value)} />
                 </div>
@@ -82,7 +84,7 @@ export default function ResetPassword({ token, onDone }) {
               <CardFooter>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading && <LoaderCircle className="animate-spin" />}
-                  Set new password
+                  {t('resetPassword.submit')}
                 </Button>
               </CardFooter>
             </form>

@@ -5,8 +5,10 @@ import { Button } from './ui/button.jsx'
 import { Input } from './ui/input.jsx'
 import { Card } from './ui/card.jsx'
 import MembersPanel from './Members.jsx'
+import { useTranslation } from '../lib/i18n.jsx'
 
 function CardItem({ card, columns, onChanged }) {
+  const { t } = useTranslation()
   const [title, setTitle] = useState(card.title)
   const [description, setDescription] = useState(card.description)
 
@@ -28,7 +30,7 @@ function CardItem({ card, columns, onChanged }) {
   }
 
   const remove = async () => {
-    if (!confirm('Delete this card?')) return
+    if (!confirm(t('board.confirmDeleteCard'))) return
     await api.deleteCard(card.id)
     onChanged()
   }
@@ -44,7 +46,7 @@ function CardItem({ card, columns, onChanged }) {
       <textarea
         className="resize-none rounded border-0 bg-transparent px-0.5 text-xs text-muted-foreground outline-none focus:bg-accent"
         rows={2}
-        placeholder="Description"
+        placeholder={t('common.description')}
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         onBlur={saveDescription}
@@ -66,6 +68,7 @@ function CardItem({ card, columns, onChanged }) {
 }
 
 function ColumnLane({ column, columns, onChanged }) {
+  const { t } = useTranslation()
   const [name, setName] = useState(column.name)
   const [newCardTitle, setNewCardTitle] = useState('')
 
@@ -84,7 +87,7 @@ function ColumnLane({ column, columns, onChanged }) {
   }
 
   const removeColumn = async () => {
-    if (!confirm('Delete this column and its cards?')) return
+    if (!confirm(t('board.confirmDeleteColumn'))) return
     await api.deleteColumn(column.id)
     onChanged()
   }
@@ -107,13 +110,13 @@ function ColumnLane({ column, columns, onChanged }) {
         {column.cards.map((card) => (
           <CardItem key={card.id} card={card} columns={columns} onChanged={onChanged} />
         ))}
-        {column.cards.length === 0 && <div className="px-1 text-xs text-muted-foreground">No cards</div>}
+        {column.cards.length === 0 && <div className="px-1 text-xs text-muted-foreground">{t('board.noCards')}</div>}
       </div>
 
       <form onSubmit={addCard} className="flex gap-1.5">
         <Input
           className="h-8 min-w-0 flex-1 rounded-md bg-background text-xs"
-          placeholder="New card title"
+          placeholder={t('board.newCardTitle')}
           value={newCardTitle}
           onChange={(e) => setNewCardTitle(e.target.value)}
         />
@@ -126,6 +129,7 @@ function ColumnLane({ column, columns, onChanged }) {
 }
 
 export default function Board({ boardId, onBack, me }) {
+  const { t } = useTranslation()
   const [board, setBoard] = useState(null)
   const [error, setError] = useState('')
   const [newColumnName, setNewColumnName] = useState('')
@@ -144,13 +148,13 @@ export default function Board({ boardId, onBack, me }) {
   }
 
   const deleteBoard = async () => {
-    if (!confirm('Delete this board and everything in it?')) return
+    if (!confirm(t('board.confirmDeleteBoard'))) return
     await api.deleteBoard(boardId)
     onBack()
   }
 
   if (error) return <Card className="p-4 text-sm text-destructive">{error}</Card>
-  if (!board) return <div className="text-sm text-muted-foreground">Loading...</div>
+  if (!board) return <div className="text-sm text-muted-foreground">{t('common.loading')}</div>
 
   const isOwner = me && board.ownerId === me.id
 
@@ -159,17 +163,17 @@ export default function Board({ boardId, onBack, me }) {
       <div className="mb-5 flex items-center gap-3">
         <Button variant="outline" size="sm" onClick={onBack}>
           <ArrowLeft />
-          Boards
+          {t('board.boards')}
         </Button>
         <h2 className="flex-1 text-lg font-semibold tracking-tight">{board.name}</h2>
         <Button variant="outline" size="sm" onClick={() => setShowMembers(true)}>
           <Users />
-          Members
+          {t('board.members')}
         </Button>
         {isOwner && (
           <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={deleteBoard}>
             <Trash2 />
-            Delete board
+            {t('board.deleteBoard')}
           </Button>
         )}
       </div>
@@ -186,7 +190,7 @@ export default function Board({ boardId, onBack, me }) {
         <form onSubmit={addColumn} className="flex w-64 shrink-0 gap-1.5 pt-1">
           <Input
             className="h-9"
-            placeholder="New column name"
+            placeholder={t('board.newColumnName')}
             value={newColumnName}
             onChange={(e) => setNewColumnName(e.target.value)}
           />

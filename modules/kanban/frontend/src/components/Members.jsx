@@ -5,8 +5,10 @@ import { Button } from './ui/button.jsx'
 import { Input } from './ui/input.jsx'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.jsx'
 import { Alert, AlertDescription } from './ui/alert.jsx'
+import { useTranslation } from '../lib/i18n.jsx'
 
 export default function Members({ board, isOwner, onClose, onChanged }) {
+  const { t } = useTranslation()
   const [members, setMembers] = useState([])
   const [username, setUsername] = useState('')
   const [error, setError] = useState('')
@@ -29,7 +31,7 @@ export default function Members({ board, isOwner, onClose, onChanged }) {
   }
 
   const remove = async (userId) => {
-    if (!confirm('Remove this member from the board?')) return
+    if (!confirm(t('members.confirmRemove'))) return
     try {
       await api.removeMember(board.id, userId)
       load()
@@ -43,7 +45,7 @@ export default function Members({ board, isOwner, onClose, onChanged }) {
     <div className="fixed inset-0 z-20 flex items-start justify-center bg-black/40 p-4 pt-20" onClick={onClose}>
       <Card className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <CardHeader className="flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-base">Members</CardTitle>
+          <CardTitle className="text-base">{t('members.title')}</CardTitle>
           <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4" /></Button>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -71,7 +73,7 @@ export default function Members({ board, isOwner, onClose, onChanged }) {
           {isOwner && (
             <form onSubmit={submit} className="flex gap-2">
               <Input
-                placeholder="Username to invite"
+                placeholder={t('members.inviteUsername')}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="h-9"
@@ -82,7 +84,7 @@ export default function Members({ board, isOwner, onClose, onChanged }) {
             </form>
           )}
           {!isOwner && (
-            <p className="text-xs text-muted-foreground">Only the board owner can add or remove members.</p>
+            <p className="text-xs text-muted-foreground">{t('members.ownerOnlyHint')}</p>
           )}
         </CardContent>
       </Card>

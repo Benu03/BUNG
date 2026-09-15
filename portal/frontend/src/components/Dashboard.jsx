@@ -1,9 +1,13 @@
-import { ArrowRight, KeyRound, LogOut, Megaphone, PackageOpen } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowRight, Megaphone, PackageOpen } from 'lucide-react'
 import { Button } from './ui/button.jsx'
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from './ui/card.jsx'
 import { Alert, AlertDescription } from './ui/alert.jsx'
 import Logo from './Logo.jsx'
 import ThemeToggle from './ThemeToggle.jsx'
+import LanguageToggle from './LanguageToggle.jsx'
+import ProfileModal from './ProfileModal.jsx'
+import { useTranslation } from '../lib/i18n.jsx'
 
 // Pastel duo per module, cycling - soft enough to sit quietly behind dark
 // text (see the icon markup below, which uses a dark slate text color
@@ -27,6 +31,8 @@ function initials(name) {
 }
 
 export default function Dashboard({ user, onLogout, settings, onChangePassword }) {
+  const { t } = useTranslation()
+  const [showProfile, setShowProfile] = useState(false)
   const modules = user.modules || []
 
   return (
@@ -38,27 +44,29 @@ export default function Dashboard({ user, onLogout, settings, onChangePassword }
             <span className="font-semibold tracking-tight">{settings.siteName}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="mr-1 text-sm text-primary-foreground/80">{user.fullName || user.username}</span>
-            <Button
-              size="icon"
-              title="Change password"
-              onClick={onChangePassword}
-              className="border border-white/25 bg-white/10 text-primary-foreground shadow-none hover:bg-white/20"
-            >
-              <KeyRound className="h-4 w-4" />
-            </Button>
+            <LanguageToggle className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <ThemeToggle className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
-            <Button
-              size="sm"
-              onClick={onLogout}
-              className="border border-white/25 bg-white/10 text-primary-foreground shadow-none hover:bg-white/20"
+            <button
+              onClick={() => setShowProfile(true)}
+              className="flex items-center gap-2 rounded-full border border-white/25 bg-white/10 py-1 pl-1 pr-3 transition-colors hover:bg-white/20"
             >
-              <LogOut />
-              Logout
-            </Button>
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/25 text-xs font-semibold">
+                {initials(user.fullName || user.username)}
+              </span>
+              <span className="text-sm">{user.fullName || user.username}</span>
+            </button>
           </div>
         </div>
       </header>
+
+      {showProfile && (
+        <ProfileModal
+          user={user}
+          onClose={() => setShowProfile(false)}
+          onChangePassword={onChangePassword}
+          onLogout={onLogout}
+        />
+      )}
 
       <main className="mx-auto max-w-5xl px-4 py-10">
         {settings.announcement && (
@@ -69,17 +77,15 @@ export default function Dashboard({ user, onLogout, settings, onChangePassword }
         )}
 
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold tracking-tight">Your modules</h1>
-          <p className="text-sm text-muted-foreground">Pick a module to get started.</p>
+          <h1 className="text-2xl font-semibold tracking-tight">{t('dashboard.yourModules')}</h1>
+          <p className="text-sm text-muted-foreground">{t('dashboard.pickModule')}</p>
         </div>
 
         {modules.length === 0 ? (
           <Card className="flex flex-col items-center gap-2 rounded-2xl border-dashed py-16 text-center">
             <PackageOpen className="h-8 w-8 text-muted-foreground" />
-            <p className="font-medium">No modules assigned yet</p>
-            <p className="max-w-xs text-sm text-muted-foreground">
-              Ask an administrator to assign a role with module access to your account.
-            </p>
+            <p className="font-medium">{t('dashboard.noModulesAssigned')}</p>
+            <p className="max-w-xs text-sm text-muted-foreground">{t('dashboard.askAdmin')}</p>
           </Card>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
