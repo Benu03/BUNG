@@ -1,0 +1,48 @@
+# Same log-rotation cap as the root docker-compose.yml - repeated per file
+# since YAML anchors don't cross the files `include:` merges in.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  chat-frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_BASE: ${CHAT_VITE_BASE:-/chat/}
+    networks:
+      - app-network
+    logging: *default-logging
+    restart: unless-stopped
+
+  chat-backend:
+    build:
+      context: ./backend
+    environment:
+      - PORT=${CHAT_BACKEND_PORT:-8080}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-bung}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-bung}
+      - DB_NAME=${POSTGRES_DB:-bung}
+      - DB_SCHEMA=${CHAT_DB_SCHEMA:-chat}
+      - DB_SSLMODE=disable
+      - DATA_DIR=/data
+    volumes:
+      - chat-data:/data
+    networks:
+      - app-network
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      # Reads app_maintenance.users/roles directly (cross-schema - the
+      # "add friend" search and the broadcast admin check).
+      app-maintenance-backend:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  chat-data:

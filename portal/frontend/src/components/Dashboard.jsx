@@ -10,6 +10,7 @@ import ThemeToggle from './ThemeToggle.jsx'
 import LanguageToggle from './LanguageToggle.jsx'
 import ProfileModal from './ProfileModal.jsx'
 import NotificationBell from './NotificationBell.jsx'
+import ChatButton from './ChatButton.jsx'
 import CommandPalette from './CommandPalette.jsx'
 import { useTranslation } from '../lib/i18n.jsx'
 
@@ -146,6 +147,7 @@ export default function Dashboard({ user, onLogout, settings, onChangePassword }
             <ThemeToggle className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <CommandPalette className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <NotificationBell className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
+            <ChatButton className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <button
               onClick={() => setShowProfile(true)}
               className="flex items-center gap-2 rounded-full border border-white/25 bg-white/10 py-1 pl-1 pr-3 transition-colors hover:bg-white/20"
