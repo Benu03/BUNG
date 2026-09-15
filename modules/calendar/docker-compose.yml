@@ -1,0 +1,28 @@
+services:
+  calendar-frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_BASE: ${CALENDAR_VITE_BASE:-/calendar/}
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  calendar-backend:
+    build:
+      context: ./backend
+    environment:
+      - PORT=${CALENDAR_BACKEND_PORT:-8080}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-bung}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-bung}
+      - DB_NAME=${POSTGRES_DB:-bung}
+      - DB_SCHEMA=${CALENDAR_DB_SCHEMA:-calendar}
+      - DB_SSLMODE=disable
+    networks:
+      - app-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped

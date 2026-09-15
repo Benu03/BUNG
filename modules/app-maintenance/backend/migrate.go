@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -150,50 +151,108 @@ func quoteIdent(s string) string {
 	return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
 }
 
+// ensureModule inserts a modules row for `code` if one doesn't already
+// exist (idempotent - safe to call on every startup, unlike the old "only
+// seed once" approach), returning its id and whether this call is what
+// created it.
+func ensureModule(db *sql.DB, code, name, description string) (id string, created bool, err error) {
+	err = db.QueryRow(
+		`INSERT INTO modules (code, name, description) VALUES ($1, $2, $3)
+		 ON CONFLICT (code) DO NOTHING RETURNING id`,
+		code, name, description,
+	).Scan(&id)
+	if err == nil {
+		return id, true, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return "", false, err
+	}
+	// ON CONFLICT DO NOTHING with no matching RETURNING row -> already existed.
+	err = db.QueryRow(`SELECT id FROM modules WHERE code = $1`, code).Scan(&id)
+	return id, false, err
+}
+
+// ensureAdministratorRole is the same idempotent pattern as ensureModule,
+// for the one "Administrator" role every known module gets automatically.
+func ensureAdministratorRole(db *sql.DB, moduleID string) (string, error) {
+	var id string
+	err := db.QueryRow(
+		`INSERT INTO roles (module_id, name, description) VALUES ($1, 'Administrator', 'Full access to this module')
+		 ON CONFLICT (module_id, name) DO NOTHING RETURNING id`,
+		moduleID,
+	).Scan(&id)
+	if err == nil {
+		return id, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return "", err
+	}
+	err = db.QueryRow(`SELECT id FROM roles WHERE module_id = $1 AND name = 'Administrator'`, moduleID).Scan(&id)
+	return id, err
+}
+
 func seed(db *sql.DB) error {
 	if _, err := db.Exec(`INSERT INTO site_settings (id, site_name, tagline) VALUES ('default', 'BUNG', 'Sign in to access your modules') ON CONFLICT (id) DO NOTHING`); err != nil {
 		return fmt.Errorf("seed site_settings: %w", err)
 	}
 
-	var count int
-	if err := db.QueryRow(`SELECT count(*) FROM users`).Scan(&count); err != nil {
-		return err
-	}
-	if count > 0 {
-		return nil
-	}
-
-	var userID string
-
-	// Seed one registry row per module that ships with this stack (drives
-	// the portal's module list), plus one "Administrator" role scoped to
-	// each - when you add a new module folder, add it here too (or via the
-	// Modules + Roles tabs) so it shows up on the portal and has a role to
-	// assign.
+	// Registry of modules that ship with this stack (drives the portal's
+	// module list), plus one "Administrator" role scoped to each - when you
+	// add a new module folder, add it here too (or via the Modules + Roles
+	// tabs) so it shows up on the portal and has a role to assign. This
+	// runs on every startup (ensureModule/ensureAdministratorRole are
+	// idempotent), not just the very first one, so adding a module to an
+	// already-running install just needs a redeploy - no destructive schema
+	// reset required.
 	knownModules := []struct{ code, name, description string }{
 		{"app-maintenance", "App Maintenance", "User, module and role administration"},
 		{"kanban", "Kanban", "Boards, columns and cards"},
 		{"my-storage", "My Storage", "Your private files"},
+		{"calendar", "Calendar", "Personal events and schedule"},
 	}
 
-	adminRoleIDs := make([]string, 0, len(knownModules))
+	var userCount int
+	if err := db.QueryRow(`SELECT count(*) FROM users`).Scan(&userCount); err != nil {
+		return err
+	}
+	firstBoot := userCount == 0
+
+	// Best-effort: only used so a module registered *after* first boot
+	// (i.e. added in a later release) is immediately usable by the
+	// original seeded admin account too, without a manual Roles tab step.
+	var adminUserID string
+	if !firstBoot {
+		_ = db.QueryRow(`SELECT id FROM users WHERE username = 'admin'`).Scan(&adminUserID)
+	}
+
+	bootstrapRoleIDs := make([]string, 0, len(knownModules))
 	for _, m := range knownModules {
-		var moduleID string
-		if err := db.QueryRow(
-			`INSERT INTO modules (code, name, description) VALUES ($1, $2, $3) RETURNING id`,
-			m.code, m.name, m.description,
-		).Scan(&moduleID); err != nil {
-			return fmt.Errorf("seed module %s: %w", m.code, err)
+		moduleID, created, err := ensureModule(db, m.code, m.name, m.description)
+		if err != nil {
+			return fmt.Errorf("ensure module %s: %w", m.code, err)
+		}
+		roleID, err := ensureAdministratorRole(db, moduleID)
+		if err != nil {
+			return fmt.Errorf("ensure role for %s: %w", m.code, err)
 		}
 
-		var roleID string
-		if err := db.QueryRow(
-			`INSERT INTO roles (module_id, name, description) VALUES ($1, $2, $3) RETURNING id`,
-			moduleID, "Administrator", "Full access to this module",
-		).Scan(&roleID); err != nil {
-			return fmt.Errorf("seed role for %s: %w", m.code, err)
+		if firstBoot {
+			bootstrapRoleIDs = append(bootstrapRoleIDs, roleID)
+			continue
 		}
-		adminRoleIDs = append(adminRoleIDs, roleID)
+		if created && adminUserID != "" {
+			if _, err := db.Exec(
+				`INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+				adminUserID, roleID,
+			); err != nil {
+				return fmt.Errorf("grant new module %s to admin: %w", m.code, err)
+			}
+			log.Printf("registered new module %q and granted its Administrator role to the admin account", m.code)
+		}
+	}
+
+	if !firstBoot {
+		return nil
 	}
 
 	// Default admin password comes from env (see .env's SEED_ADMIN_PASSWORD)
@@ -204,6 +263,7 @@ func seed(db *sql.DB) error {
 		return fmt.Errorf("seed password hash: %w", err)
 	}
 
+	var userID string
 	if err := db.QueryRow(
 		`INSERT INTO users (username, full_name, email, password_hash) VALUES ($1, $2, $3, $4) RETURNING id`,
 		"admin", "System Administrator", "admin@example.com", hash,
@@ -211,7 +271,7 @@ func seed(db *sql.DB) error {
 		return fmt.Errorf("seed user: %w", err)
 	}
 
-	for _, roleID := range adminRoleIDs {
+	for _, roleID := range bootstrapRoleIDs {
 		if _, err := db.Exec(`INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)`, userID, roleID); err != nil {
 			return fmt.Errorf("seed user_roles: %w", err)
 		}
