@@ -11,8 +11,12 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: #714b67;
-  --primary-dark: #4f3348;
+  /* Pastel duo: soft lavender -> soft rose. Used together for gradient
+     headers/buttons (from-primary to-primary-dark); --primary alone for
+     solid buttons/badges/focus rings. Kept just deep enough that white
+     --primary-foreground text still reads clearly on top of it. */
+  --primary: #8d6fc9;
+  --primary-dark: #cf7cae;
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -37,8 +41,8 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: #9c7291;
-  --primary-dark: #6b4763;
+  --primary: #b9a1e0;
+  --primary-dark: #dba8c5;
   --primary-foreground: oklch(0.145 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);

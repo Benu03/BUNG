@@ -5,13 +5,16 @@ import { Alert, AlertDescription } from './ui/alert.jsx'
 import Logo from './Logo.jsx'
 import ThemeToggle from './ThemeToggle.jsx'
 
+// Pastel duo per module, cycling - soft enough to sit quietly behind dark
+// text (see the icon markup below, which uses a dark slate text color
+// instead of white for exactly that reason).
 const ICON_GRADIENTS = [
-  'from-violet-500 to-fuchsia-500',
-  'from-sky-500 to-cyan-400',
-  'from-amber-500 to-orange-500',
-  'from-emerald-500 to-teal-400',
-  'from-rose-500 to-pink-500',
-  'from-indigo-500 to-blue-500',
+  'from-violet-200 to-fuchsia-200',
+  'from-sky-200 to-cyan-100',
+  'from-amber-100 to-orange-200',
+  'from-emerald-200 to-teal-100',
+  'from-rose-200 to-pink-200',
+  'from-indigo-200 to-blue-100',
 ]
 
 function initials(name) {
@@ -84,7 +87,7 @@ export default function Dashboard({ user, onLogout, settings, onChangePassword }
               <a key={m.code} href={`/${m.code}/`} className="group">
                 <Card className="h-full rounded-2xl border-border/60 shadow-sm transition-all duration-200 group-hover:-translate-y-0.5 group-hover:shadow-lg">
                   <CardHeader className="gap-3">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br text-sm font-semibold text-white ${ICON_GRADIENTS[i % ICON_GRADIENTS.length]}`}>
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br text-sm font-semibold text-slate-700 ${ICON_GRADIENTS[i % ICON_GRADIENTS.length]}`}>
                       {initials(m.name)}
                     </div>
                     <div>
