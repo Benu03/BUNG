@@ -11,12 +11,13 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  /* Pastel duo: soft lavender -> soft rose. Used together for gradient
-     headers/buttons (from-primary to-primary-dark); --primary alone for
-     solid buttons/badges/focus rings. Kept just deep enough that white
-     --primary-foreground text still reads clearly on top of it. */
-  --primary: #8d6fc9;
-  --primary-dark: #cf7cae;
+  /* Teal -> charcoal, matching the BUNG logo mark (see public/logo.png).
+     Used together for gradient headers/buttons (from-primary to-
+     primary-dark); --primary alone for solid buttons/badges/focus rings.
+     Kept deep enough that white --primary-foreground text still reads
+     clearly on top of either end of the gradient. */
+  --primary: #14a6a3;
+  --primary-dark: #33333f;
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -41,8 +42,8 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: #b9a1e0;
-  --primary-dark: #dba8c5;
+  --primary: #2dd4cf;
+  --primary-dark: #6b6980;
   --primary-foreground: oklch(0.145 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
