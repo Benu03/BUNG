@@ -1,0 +1,24 @@
+# Same log-rotation cap as the root docker-compose.yml - repeated per file
+# since YAML anchors don't cross the files `include:` merges in.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  logs-backend:
+    build:
+      context: ./backend
+    environment:
+      - PORT=${LOGS_BACKEND_PORT:-8080}
+    volumes:
+      # Read-only per Docker's own flag, but see docker.go's SECURITY
+      # NOTE - this still grants full Docker Engine API reachability at
+      # the socket level, regardless of the ":ro" mount flag. This
+      # service's own code only ever issues GET requests.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - app-network
+    logging: *default-logging
+    restart: unless-stopped

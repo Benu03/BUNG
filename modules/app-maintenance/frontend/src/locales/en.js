@@ -26,6 +26,7 @@ export default {
     modules: 'Modules',
     settings: 'Settings',
     auditLog: 'Audit Log',
+    logs: 'Logs',
   },
   users: {
     addUser: 'Add user',
@@ -113,6 +114,16 @@ export default {
     traceRequestHint: 'Show everything that happened during this one request',
     applyFilters: 'Apply',
     clearFilters: 'Clear',
+  },
+  logs: {
+    refresh: 'Refresh',
+    pause: 'Pause',
+    resume: 'Resume',
+    clear: 'Clear',
+    live: 'Live',
+    disconnected: 'Disconnected',
+    empty: 'No log lines yet.',
+    footerHint: 'Live container logs (read-only), admin access only.',
   },
   bell: {
     title: 'Notifications',

@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { ArrowLeft, LogOut, Shield, Users as UsersIcon, LayoutGrid, Settings as SettingsIcon, ScrollText } from 'lucide-react'
+import { ArrowLeft, LogOut, Shield, Users as UsersIcon, LayoutGrid, Settings as SettingsIcon, ScrollText, Terminal } from 'lucide-react'
 import Users from './components/Users.jsx'
 import Roles from './components/Roles.jsx'
 import Modules from './components/Modules.jsx'
 import Settings from './components/Settings.jsx'
 import AuditLog from './components/AuditLog.jsx'
+import Logs from './components/Logs.jsx'
 import Logo from './components/Logo.jsx'
 import ThemeToggle from './components/ThemeToggle.jsx'
 import LanguageToggle from './components/LanguageToggle.jsx'
@@ -20,6 +21,7 @@ const TABS = [
   { key: 'modules', labelKey: 'tabs.modules', icon: LayoutGrid, render: () => <Modules /> },
   { key: 'settings', labelKey: 'tabs.settings', icon: SettingsIcon, render: () => <Settings /> },
   { key: 'audit', labelKey: 'tabs.auditLog', icon: ScrollText, render: () => <AuditLog /> },
+  { key: 'logs', labelKey: 'tabs.logs', icon: Terminal, render: () => <Logs /> },
 ]
 
 export default function App() {

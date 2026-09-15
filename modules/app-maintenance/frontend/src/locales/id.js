@@ -26,6 +26,7 @@ export default {
     modules: 'Module',
     settings: 'Pengaturan',
     auditLog: 'Log Aktivitas',
+    logs: 'Logs',
   },
   users: {
     addUser: 'Tambah pengguna',
@@ -113,6 +114,16 @@ export default {
     traceRequestHint: 'Tampilkan semua yang terjadi pada request ini',
     applyFilters: 'Terapkan',
     clearFilters: 'Bersihkan',
+  },
+  logs: {
+    refresh: 'Muat ulang',
+    pause: 'Jeda',
+    resume: 'Lanjutkan',
+    clear: 'Bersihkan',
+    live: 'Live',
+    disconnected: 'Terputus',
+    empty: 'Belum ada log.',
+    footerHint: 'Log container secara langsung (read-only), hanya untuk admin.',
   },
   bell: {
     title: 'Notifikasi',
