@@ -38,6 +38,8 @@ export default {
     greetingEvening: 'Selamat sore',
     greetingNight: 'Selamat malam',
     searchPlaceholder: 'Cari module kamu...',
+    favorites: 'Favorit',
+    allModules: 'Semua module',
   },
   forgotPassword: {
     title: 'Reset kata sandi',

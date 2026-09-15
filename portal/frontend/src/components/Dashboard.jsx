@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Megaphone, PackageOpen, Search, Star } from 'lucide-react'
+import {
+  Bell, CalendarDays, FolderOpen, LayoutGrid, Megaphone, PackageOpen, Search, Settings, Star, Ticket,
+} from 'lucide-react'
 import { Input } from './ui/input.jsx'
 import { Card } from './ui/card.jsx'
 import { Alert, AlertDescription } from './ui/alert.jsx'
@@ -44,6 +46,19 @@ const ICON_GRADIENTS = [
   'from-indigo-200 to-blue-100',
 ]
 
+// Same icon each module already uses in its own header, for a consistent
+// mark across the whole platform - falls back to initials (see below) for
+// a module code this list doesn't know about, so a future module never
+// renders blank.
+const MODULE_ICONS = {
+  'app-maintenance': Settings,
+  kanban: LayoutGrid,
+  'my-storage': FolderOpen,
+  calendar: CalendarDays,
+  ticketing: Ticket,
+  notifications: Bell,
+}
+
 function initials(name) {
   return name
     .split(' ')
@@ -87,10 +102,36 @@ export default function Dashboard({ user, onLogout, settings, onChangePassword }
   const q = filter.trim().toLowerCase()
   const visibleModules = modules
     .filter((m) => !q || [m.name, m.description, m.code].some((v) => v?.toLowerCase().includes(q)))
-    // Favorites first, stable otherwise (Array.prototype.sort is stable
-    // in modern JS engines).
-    .slice()
-    .sort((a, b) => Number(favorites.has(b.code)) - Number(favorites.has(a.code)))
+
+  // Favorited modules get their own row up top (a common, more polished
+  // dashboard pattern than just reordering one flat grid) - everything
+  // else follows below.
+  const favoriteModules = visibleModules.filter((m) => favorites.has(m.code))
+  const otherModules = visibleModules.filter((m) => !favorites.has(m.code))
+
+  const renderTile = (m, i) => {
+    const isFavorite = favorites.has(m.code)
+    const Icon = MODULE_ICONS[m.code]
+    return (
+      <a key={m.code} href={`/${m.code}/`} className="group" title={m.description}>
+        <div className="relative flex h-full flex-col items-center gap-2 rounded-xl border border-border/60 bg-card px-2 py-4 text-center shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md">
+          <button
+            onClick={(e) => toggleFavorite(m.code, e)}
+            title={t(isFavorite ? 'dashboard.removeFavorite' : 'dashboard.addFavorite')}
+            className={`absolute right-1.5 top-1.5 rounded-full p-1 transition-opacity ${
+              isFavorite ? 'text-amber-500 opacity-100' : 'text-muted-foreground/40 opacity-0 hover:text-amber-500 group-hover:opacity-100'
+            }`}
+          >
+            <Star className={`h-3.5 w-3.5 ${isFavorite ? 'fill-amber-400' : ''}`} />
+          </button>
+          <div className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br text-base font-semibold text-slate-700 shadow-sm transition-transform duration-200 group-hover:scale-105 sm:h-16 sm:w-16 ${ICON_GRADIENTS[i % ICON_GRADIENTS.length]}`}>
+            {Icon ? <Icon className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={1.75} /> : initials(m.name)}
+          </div>
+          <span className="line-clamp-2 text-xs font-medium leading-tight text-foreground sm:text-sm">{m.name}</span>
+        </div>
+      </a>
+    )
+  }
 
   return (
     <div className="min-h-svh bg-muted/30">
@@ -165,33 +206,36 @@ export default function Dashboard({ user, onLogout, settings, onChangePassword }
             {t('common.noMatches')}
           </Card>
         ) : (
-          // Compact icon-tile grid (Odoo app-launcher style) - the icon
-          // does the identifying, the name is a one-line label underneath,
-          // and the description moves to a hover tooltip instead of taking
-          // up its own line, so far more modules fit on screen at once.
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3 md:grid-cols-5 lg:grid-cols-6">
-            {visibleModules.map((m, i) => {
-              const isFavorite = favorites.has(m.code)
-              return (
-                <a key={m.code} href={`/${m.code}/`} className="group" title={m.description}>
-                  <div className="relative flex flex-col items-center gap-2 rounded-xl px-2 py-3 text-center transition-colors hover:bg-card hover:shadow-sm">
-                    <button
-                      onClick={(e) => toggleFavorite(m.code, e)}
-                      title={t(isFavorite ? 'dashboard.removeFavorite' : 'dashboard.addFavorite')}
-                      className={`absolute right-0.5 top-0.5 rounded-full p-1 transition-opacity ${
-                        isFavorite ? 'text-amber-500 opacity-100' : 'text-muted-foreground/40 opacity-0 hover:text-amber-500 group-hover:opacity-100'
-                      }`}
-                    >
-                      <Star className={`h-3.5 w-3.5 ${isFavorite ? 'fill-amber-400' : ''}`} />
-                    </button>
-                    <div className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br text-base font-semibold text-slate-700 shadow-sm transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:shadow-md sm:h-16 sm:w-16 ${ICON_GRADIENTS[i % ICON_GRADIENTS.length]}`}>
-                      {initials(m.name)}
-                    </div>
-                    <span className="line-clamp-2 text-xs font-medium leading-tight text-foreground sm:text-sm">{m.name}</span>
-                  </div>
-                </a>
-              )
-            })}
+          <div className="flex flex-col gap-8">
+            {favoriteModules.length > 0 && (
+              <div className="flex flex-col gap-3">
+                <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
+                  {t('dashboard.favorites')}
+                </h2>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3 md:grid-cols-5 lg:grid-cols-6">
+                  {favoriteModules.map(renderTile)}
+                </div>
+              </div>
+            )}
+
+            {otherModules.length > 0 && (
+              <div className="flex flex-col gap-3">
+                {favoriteModules.length > 0 && (
+                  <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {t('dashboard.allModules')}
+                  </h2>
+                )}
+                {/* Compact icon-tile grid (Odoo app-launcher style) - each
+                    module's own header icon does the identifying, the name
+                    is a one-line label underneath, and the description
+                    moves to a hover tooltip instead of taking its own
+                    line, so far more modules fit on screen at once. */}
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3 md:grid-cols-5 lg:grid-cols-6">
+                  {otherModules.map(renderTile)}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>

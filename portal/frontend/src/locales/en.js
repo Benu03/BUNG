@@ -38,6 +38,8 @@ export default {
     greetingEvening: 'Good evening',
     greetingNight: 'Good night',
     searchPlaceholder: 'Search your modules...',
+    favorites: 'Favorites',
+    allModules: 'All modules',
   },
   forgotPassword: {
     title: 'Reset your password',
