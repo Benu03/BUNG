@@ -67,4 +67,10 @@ export default {
     signOutInstead: 'Keluar saja',
     passwordsDontMatch: 'Kata sandi tidak cocok.',
   },
+  bell: {
+    title: 'Notifikasi',
+    viewAll: 'Lihat semua',
+    empty: 'Belum ada notifikasi.',
+    markAllRead: 'Tandai semua dibaca',
+  },
 }

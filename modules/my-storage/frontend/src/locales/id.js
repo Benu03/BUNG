@@ -29,4 +29,10 @@ export default {
     confirmDeleteFolder: 'Hapus folder ini beserta isinya?',
     confirmDeleteFile: 'Hapus file ini?',
   },
+  bell: {
+    title: 'Notifikasi',
+    viewAll: 'Lihat semua',
+    empty: 'Belum ada notifikasi.',
+    markAllRead: 'Tandai semua dibaca',
+  },
 }

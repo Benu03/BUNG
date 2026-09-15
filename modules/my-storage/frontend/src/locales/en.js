@@ -29,4 +29,10 @@ export default {
     confirmDeleteFolder: 'Delete this folder and everything inside it?',
     confirmDeleteFile: 'Delete this file?',
   },
+  bell: {
+    title: 'Notifications',
+    viewAll: 'View all',
+    empty: 'No notifications yet.',
+    markAllRead: 'Mark all read',
+  },
 }

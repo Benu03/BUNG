@@ -105,4 +105,10 @@ export default {
     loadMore: 'Load more',
     loading: 'Loading...',
   },
+  bell: {
+    title: 'Notifications',
+    viewAll: 'View all',
+    empty: 'No notifications yet.',
+    markAllRead: 'Mark all read',
+  },
 }

@@ -105,4 +105,10 @@ export default {
     loadMore: 'Muat lagi',
     loading: 'Memuat...',
   },
+  bell: {
+    title: 'Notifikasi',
+    viewAll: 'Lihat semua',
+    empty: 'Belum ada notifikasi.',
+    markAllRead: 'Tandai semua dibaca',
+  },
 }

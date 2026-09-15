@@ -31,4 +31,8 @@ services:
       # fully eliminate, the race on a very first `docker compose up`.
       app-maintenance-backend:
         condition: service_started
+      # Adding a board member notifies them (cross-schema write into
+      # notifications.inbox, see notify.go) - that schema must exist first.
+      notifications-backend:
+        condition: service_started
     restart: unless-stopped

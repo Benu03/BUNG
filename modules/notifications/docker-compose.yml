@@ -1,0 +1,28 @@
+services:
+  notifications-frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_BASE: ${NOTIFICATIONS_VITE_BASE:-/notifications/}
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  notifications-backend:
+    build:
+      context: ./backend
+    environment:
+      - PORT=${NOTIFICATIONS_BACKEND_PORT:-8080}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-bung}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-bung}
+      - DB_NAME=${POSTGRES_DB:-bung}
+      - DB_SCHEMA=${NOTIFICATIONS_DB_SCHEMA:-notifications}
+      - DB_SSLMODE=disable
+    networks:
+      - app-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped

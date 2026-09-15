@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 )
@@ -159,6 +160,13 @@ func (a *api) addMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeAudit(a.store.db, r, "board.add_member", "board", boardID, map[string]any{"username": m.Username})
+	if board, err := a.store.getBoard(boardID); err == nil {
+		notify(a.store.db, m.UserID, "kanban", "board.member_added",
+			"Added to a board",
+			fmt.Sprintf("You were added to the board \"%s\".", board.Name),
+			"/kanban/",
+		)
+	}
 	writeJSON(w, http.StatusCreated, m)
 }
 

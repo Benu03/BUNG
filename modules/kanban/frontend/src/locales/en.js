@@ -46,4 +46,10 @@ export default {
     ownerOnlyHint: 'Only the board owner can add or remove members.',
     confirmRemove: 'Remove this member from the board?',
   },
+  bell: {
+    title: 'Notifications',
+    viewAll: 'View all',
+    empty: 'No notifications yet.',
+    markAllRead: 'Mark all read',
+  },
 }

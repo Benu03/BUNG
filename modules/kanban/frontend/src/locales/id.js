@@ -46,4 +46,10 @@ export default {
     ownerOnlyHint: 'Hanya pemilik board yang bisa menambah atau menghapus anggota.',
     confirmRemove: 'Keluarkan anggota ini dari board?',
   },
+  bell: {
+    title: 'Notifikasi',
+    viewAll: 'Lihat semua',
+    empty: 'Belum ada notifikasi.',
+    markAllRead: 'Tandai semua dibaca',
+  },
 }

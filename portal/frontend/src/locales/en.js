@@ -67,4 +67,10 @@ export default {
     signOutInstead: 'Sign out instead',
     passwordsDontMatch: 'Passwords do not match.',
   },
+  bell: {
+    title: 'Notifications',
+    viewAll: 'View all',
+    empty: 'No notifications yet.',
+    markAllRead: 'Mark all read',
+  },
 }

@@ -7,6 +7,7 @@ import Logo from './Logo.jsx'
 import ThemeToggle from './ThemeToggle.jsx'
 import LanguageToggle from './LanguageToggle.jsx'
 import ProfileModal from './ProfileModal.jsx'
+import NotificationBell from './NotificationBell.jsx'
 import { useTranslation } from '../lib/i18n.jsx'
 
 // Pastel duo per module, cycling - soft enough to sit quietly behind dark
@@ -46,6 +47,7 @@ export default function Dashboard({ user, onLogout, settings, onChangePassword }
           <div className="flex items-center gap-2">
             <LanguageToggle className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <ThemeToggle className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
+            <NotificationBell className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <button
               onClick={() => setShowProfile(true)}
               className="flex items-center gap-2 rounded-full border border-white/25 bg-white/10 py-1 pl-1 pr-3 transition-colors hover:bg-white/20"
