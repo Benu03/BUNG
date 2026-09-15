@@ -12,6 +12,7 @@ export default {
     description: 'Deskripsi',
     filterPlaceholder: 'Filter...',
     noMatches: 'Tidak ada yang cocok dengan filter.',
+    close: 'Tutup',
   },
   header: {
     title: 'Kanban',
@@ -41,6 +42,14 @@ export default {
     confirmDeleteBoard: 'Hapus board ini beserta isinya?',
     live: 'Live - perubahan dari anggota lain muncul otomatis',
     reconnecting: 'Menyambungkan ulang...',
+    cardDetails: 'Detail kartu',
+    cardTitle: 'Judul',
+    column: 'Kolom',
+    dueDate: 'Tenggat',
+    color: 'Warna',
+    colorNone: 'Tanpa warna',
+    assignee: 'Ditugaskan ke',
+    assignSomeone: 'Tugaskan ke seseorang...',
   },
   members: {
     title: 'Anggota',

@@ -203,6 +203,7 @@ func (a *api) createRole(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid body")
 		return
 	}
+	in.IsActive = true // new roles start active; use PUT to deactivate one
 	role, err := a.store.CreateRole(&in)
 	if err != nil {
 		handleErr(w, err)

@@ -28,13 +28,16 @@ export default {
     defaultAdmin: 'Admin default',
   },
   dashboard: {
-    yourModules: 'Module kamu',
-    pickModule: 'Pilih module untuk memulai.',
     noModulesAssigned: 'Belum ada module yang diberikan',
     askAdmin: 'Minta administrator untuk memberi role dengan akses module ke akun kamu.',
     changePassword: 'Ganti kata sandi',
     addFavorite: 'Tambah ke favorit',
     removeFavorite: 'Hapus dari favorit',
+    greetingMorning: 'Selamat pagi',
+    greetingAfternoon: 'Selamat siang',
+    greetingEvening: 'Selamat sore',
+    greetingNight: 'Selamat malam',
+    searchPlaceholder: 'Cari module kamu...',
   },
   forgotPassword: {
     title: 'Reset kata sandi',

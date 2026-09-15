@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"errors"
+	"time"
 )
 
 // ErrNotFound is returned when the requested row doesn't exist, or - for
@@ -373,8 +374,44 @@ func (s *Store) DeleteColumn(userID, id string) error {
 
 // ---- cards ----
 
+const cardColumns = `id, column_id, title, description, position, assignee_id, due_date, color, created_at, updated_at`
+
+// scanCard reads one cards row, handling assignee_id/due_date's nullability
+// (plain sql.Scan into *string/*time.Time fails on NULL, so these go
+// through sql.NullString/sql.NullTime first).
+func scanCard(row interface{ Scan(...any) error }) (*Card, error) {
+	var c Card
+	var assigneeID sql.NullString
+	var dueDate sql.NullTime
+	if err := row.Scan(&c.ID, &c.ColumnID, &c.Title, &c.Description, &c.Position, &assigneeID, &dueDate, &c.Color, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		return nil, err
+	}
+	if assigneeID.Valid {
+		c.AssigneeID = &assigneeID.String
+	}
+	if dueDate.Valid {
+		c.DueDate = &dueDate.Time
+	}
+	return &c, nil
+}
+
+// nullableStr/nullableTime treat a nil pointer as SQL NULL - used when
+// writing AssigneeID/DueDate below.
+func nullableStr(s *string) any {
+	if s == nil || *s == "" {
+		return nil
+	}
+	return *s
+}
+func nullableTime(t *time.Time) any {
+	if t == nil {
+		return nil
+	}
+	return *t
+}
+
 func (s *Store) listCardsByColumn(columnID string) ([]*Card, error) {
-	rows, err := s.db.Query(`SELECT id, column_id, title, description, position, created_at, updated_at FROM cards WHERE column_id = $1 ORDER BY position, created_at`, columnID)
+	rows, err := s.db.Query(`SELECT `+cardColumns+` FROM cards WHERE column_id = $1 ORDER BY position, created_at`, columnID)
 	if err != nil {
 		return nil, err
 	}
@@ -382,11 +419,11 @@ func (s *Store) listCardsByColumn(columnID string) ([]*Card, error) {
 
 	cards := []*Card{}
 	for rows.Next() {
-		var c Card
-		if err := rows.Scan(&c.ID, &c.ColumnID, &c.Title, &c.Description, &c.Position, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		c, err := scanCard(rows)
+		if err != nil {
 			return nil, err
 		}
-		cards = append(cards, &c)
+		cards = append(cards, c)
 	}
 	return cards, rows.Err()
 }
@@ -399,14 +436,12 @@ func (s *Store) CreateCard(userID string, in *Card) (*Card, error) {
 	if err := s.requireMember(boardID, userID); err != nil {
 		return nil, err
 	}
-	err = s.db.QueryRow(
-		`INSERT INTO cards (column_id, title, description, position) VALUES ($1, $2, $3, $4) RETURNING id, created_at, updated_at`,
-		in.ColumnID, in.Title, in.Description, in.Position,
-	).Scan(&in.ID, &in.CreatedAt, &in.UpdatedAt)
-	if err != nil {
-		return nil, err
-	}
-	return in, nil
+	row := s.db.QueryRow(
+		`INSERT INTO cards (column_id, title, description, position, assignee_id, due_date, color)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING `+cardColumns,
+		in.ColumnID, in.Title, in.Description, in.Position, nullableStr(in.AssigneeID), nullableTime(in.DueDate), in.Color,
+	)
+	return scanCard(row)
 }
 
 func (s *Store) UpdateCard(userID, id string, in *Card) (*Card, error) {
@@ -418,8 +453,8 @@ func (s *Store) UpdateCard(userID, id string, in *Card) (*Card, error) {
 		return nil, err
 	}
 	res, err := s.db.Exec(
-		`UPDATE cards SET title = $1, description = $2, updated_at = now() WHERE id = $3`,
-		in.Title, in.Description, id,
+		`UPDATE cards SET title = $1, description = $2, assignee_id = $3, due_date = $4, color = $5, updated_at = now() WHERE id = $6`,
+		in.Title, in.Description, nullableStr(in.AssigneeID), nullableTime(in.DueDate), in.Color, id,
 	)
 	if err != nil {
 		return nil, err
@@ -463,16 +498,15 @@ func (s *Store) MoveCard(userID, id string, columnID string, position int) (*Car
 }
 
 func (s *Store) getCard(id string) (*Card, error) {
-	var c Card
-	err := s.db.QueryRow(`SELECT id, column_id, title, description, position, created_at, updated_at FROM cards WHERE id = $1`, id).
-		Scan(&c.ID, &c.ColumnID, &c.Title, &c.Description, &c.Position, &c.CreatedAt, &c.UpdatedAt)
+	row := s.db.QueryRow(`SELECT `+cardColumns+` FROM cards WHERE id = $1`, id)
+	c, err := scanCard(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
-	return &c, nil
+	return c, nil
 }
 
 func (s *Store) DeleteCard(userID, id string) error {

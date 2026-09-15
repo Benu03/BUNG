@@ -38,6 +38,14 @@ export default function Modules() {
     load()
   }
 
+  // Deactivating (vs deleting) is reversible - the module immediately
+  // disappears from the portal for everyone at their next login (see
+  // app-maintenance's UserModules query), without losing its roles/data.
+  const toggleActive = async (m) => {
+    await api.updateModule(m.id, { ...m, isActive: !m.isActive })
+    load()
+  }
+
   const q = filter.trim().toLowerCase()
   const filteredModules = q
     ? modules.filter((m) => [m.code, m.name, m.description].some((v) => v?.toLowerCase().includes(q)))
@@ -109,7 +117,11 @@ export default function Modules() {
                   <td className="px-4 py-3 font-medium">{m.name}</td>
                   <td className="px-4 py-3 text-muted-foreground">{m.description}</td>
                   <td className="px-4 py-3">
-                    <Badge variant={m.isActive ? 'default' : 'secondary'}>{m.isActive ? t('modules.active') : t('modules.inactive')}</Badge>
+                    <button onClick={() => toggleActive(m)} title={t('modules.toggleActiveHint')}>
+                      <Badge variant={m.isActive ? 'default' : 'secondary'} className="cursor-pointer">
+                        {m.isActive ? t('modules.active') : t('modules.inactive')}
+                      </Badge>
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Button variant="ghost" size="icon" onClick={() => remove(m.id)}>

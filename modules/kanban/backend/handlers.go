@@ -249,6 +249,10 @@ func (a *api) createCard(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid body")
 		return
 	}
+	if !validCardColors[in.Color] {
+		writeErr(w, http.StatusBadRequest, "invalid color")
+		return
+	}
 	in.ColumnID = r.PathValue("id")
 	c, err := a.store.CreateCard(currentUserID(r), &in)
 	if err != nil {
@@ -265,6 +269,10 @@ func (a *api) updateCard(w http.ResponseWriter, r *http.Request) {
 	var in Card
 	if err := decodeJSON(r, &in); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+	if !validCardColors[in.Color] {
+		writeErr(w, http.StatusBadRequest, "invalid color")
 		return
 	}
 	c, err := a.store.UpdateCard(currentUserID(r), r.PathValue("id"), &in)

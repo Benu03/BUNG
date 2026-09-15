@@ -95,6 +95,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT '
 ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ NOT NULL DEFAULT now();
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_idx ON users (email);
 ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS password_expiry_days INT NOT NULL DEFAULT 60;
+ALTER TABLE roles ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
 `
 
 // auditSchemaSQL creates the shared, cross-module audit trail. It lives in

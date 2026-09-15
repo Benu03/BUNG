@@ -28,13 +28,16 @@ export default {
     defaultAdmin: 'Default admin',
   },
   dashboard: {
-    yourModules: 'Your modules',
-    pickModule: 'Pick a module to get started.',
     noModulesAssigned: 'No modules assigned yet',
     askAdmin: 'Ask an administrator to assign a role with module access to your account.',
     changePassword: 'Change password',
     addFavorite: 'Add to favorites',
     removeFavorite: 'Remove from favorites',
+    greetingMorning: 'Good morning',
+    greetingAfternoon: 'Good afternoon',
+    greetingEvening: 'Good evening',
+    greetingNight: 'Good night',
+    searchPlaceholder: 'Search your modules...',
   },
   forgotPassword: {
     title: 'Reset your password',

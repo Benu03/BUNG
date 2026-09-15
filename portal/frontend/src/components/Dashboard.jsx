@@ -53,6 +53,17 @@ function initials(name) {
     .toUpperCase()
 }
 
+// A time-of-day greeting reads as a lot more "alive" than a static
+// "Your modules" heading, at zero extra cost - same idea as the pastel
+// theme, small touches that make the landing page feel considered.
+function greetingKey() {
+  const hour = new Date().getHours()
+  if (hour < 11) return 'dashboard.greetingMorning'
+  if (hour < 15) return 'dashboard.greetingAfternoon'
+  if (hour < 19) return 'dashboard.greetingEvening'
+  return 'dashboard.greetingNight'
+}
+
 export default function Dashboard({ user, onLogout, settings, onChangePassword }) {
   const { t } = useTranslation()
   const [showProfile, setShowProfile] = useState(false)

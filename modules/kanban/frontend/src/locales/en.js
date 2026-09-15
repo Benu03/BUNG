@@ -12,6 +12,7 @@ export default {
     description: 'Description',
     filterPlaceholder: 'Filter...',
     noMatches: 'No matches for your filter.',
+    close: 'Close',
   },
   header: {
     title: 'Kanban',
@@ -41,6 +42,14 @@ export default {
     confirmDeleteBoard: 'Delete this board and everything in it?',
     live: 'Live - updates from other members appear automatically',
     reconnecting: 'Reconnecting...',
+    cardDetails: 'Card details',
+    cardTitle: 'Title',
+    column: 'Column',
+    dueDate: 'Due date',
+    color: 'Color',
+    colorNone: 'No color',
+    assignee: 'Assignee',
+    assignSomeone: 'Assign someone...',
   },
   members: {
     title: 'Members',

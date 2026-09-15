@@ -36,6 +36,7 @@ type Role struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	ModuleID    string    `json:"moduleId"`
+	IsActive    bool      `json:"isActive"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 }

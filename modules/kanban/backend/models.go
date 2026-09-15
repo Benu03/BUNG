@@ -23,15 +23,26 @@ type Column struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-// Card is a single kanban card living inside a column.
+// Card is a single kanban card living inside a column. AssigneeID has no
+// FK to app_maintenance.users, same loose-coupling reasoning as
+// board_members (see migrate.go).
 type Card struct {
-	ID          string    `json:"id"`
-	ColumnID    string    `json:"columnId"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Position    int       `json:"position"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	ID          string     `json:"id"`
+	ColumnID    string     `json:"columnId"`
+	Title       string     `json:"title"`
+	Description string     `json:"description"`
+	Position    int        `json:"position"`
+	AssigneeID  *string    `json:"assigneeId"`
+	DueDate     *time.Time `json:"dueDate"`
+	Color       string     `json:"color"` // '' or one of validCardColors
+	CreatedAt   time.Time  `json:"createdAt"`
+	UpdatedAt   time.Time  `json:"updatedAt"`
+}
+
+// validCardColors is the small preset palette cards can be tagged with -
+// matching the app's pastel theme rather than letting free-text colors in.
+var validCardColors = map[string]bool{
+	"": true, "rose": true, "amber": true, "emerald": true, "sky": true, "violet": true,
 }
 
 // BoardMember is one user's membership in a board. "owner" can manage

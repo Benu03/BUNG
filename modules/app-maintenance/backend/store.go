@@ -144,16 +144,18 @@ func (s *Store) SetUserPassword(id string, passwordHash string) error {
 }
 
 // UserModules returns the distinct, active modules a user can access via
-// any of their roles (each role belongs to exactly one module) - this is
-// what gets baked into the session JWT at login, and what the portal
-// renders.
+// any of their active roles (each role belongs to exactly one module) -
+// this is what gets baked into the session JWT at login, and what the
+// portal renders. Both the role AND the module must be active - a user
+// keeps their role assignment either way (deactivating is reversible,
+// deleting isn't), it just stops granting access while inactive.
 func (s *Store) UserModules(userID string) ([]*Module, error) {
 	rows, err := s.db.Query(`
 		SELECT DISTINCT m.id, m.code, m.name, m.description, m.is_active, m.created_at, m.updated_at
 		FROM modules m
 		JOIN roles r ON r.module_id = m.id
 		JOIN user_roles ur ON ur.role_id = r.id
-		WHERE ur.user_id = $1 AND m.is_active = true
+		WHERE ur.user_id = $1 AND m.is_active = true AND r.is_active = true
 		ORDER BY m.name`, userID)
 	if err != nil {
 		return nil, err
@@ -251,7 +253,7 @@ func (s *Store) userRoleIDs(userID string) ([]string, error) {
 // ---- roles ----
 
 func (s *Store) ListRoles() ([]*Role, error) {
-	rows, err := s.db.Query(`SELECT id, module_id, name, description, created_at, updated_at FROM roles ORDER BY created_at`)
+	rows, err := s.db.Query(`SELECT id, module_id, name, description, is_active, created_at, updated_at FROM roles ORDER BY created_at`)
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +262,7 @@ func (s *Store) ListRoles() ([]*Role, error) {
 	roles := []*Role{}
 	for rows.Next() {
 		var r Role
-		if err := rows.Scan(&r.ID, &r.ModuleID, &r.Name, &r.Description, &r.CreatedAt, &r.UpdatedAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.ModuleID, &r.Name, &r.Description, &r.IsActive, &r.CreatedAt, &r.UpdatedAt); err != nil {
 			return nil, err
 		}
 		roles = append(roles, &r)
@@ -270,8 +272,8 @@ func (s *Store) ListRoles() ([]*Role, error) {
 
 func (s *Store) GetRole(id string) (*Role, error) {
 	var r Role
-	err := s.db.QueryRow(`SELECT id, module_id, name, description, created_at, updated_at FROM roles WHERE id = $1`, id).
-		Scan(&r.ID, &r.ModuleID, &r.Name, &r.Description, &r.CreatedAt, &r.UpdatedAt)
+	err := s.db.QueryRow(`SELECT id, module_id, name, description, is_active, created_at, updated_at FROM roles WHERE id = $1`, id).
+		Scan(&r.ID, &r.ModuleID, &r.Name, &r.Description, &r.IsActive, &r.CreatedAt, &r.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -283,8 +285,8 @@ func (s *Store) GetRole(id string) (*Role, error) {
 
 func (s *Store) CreateRole(in *Role) (*Role, error) {
 	err := s.db.QueryRow(
-		`INSERT INTO roles (module_id, name, description) VALUES ($1, $2, $3) RETURNING id, created_at, updated_at`,
-		in.ModuleID, in.Name, in.Description,
+		`INSERT INTO roles (module_id, name, description, is_active) VALUES ($1, $2, $3, $4) RETURNING id, created_at, updated_at`,
+		in.ModuleID, in.Name, in.Description, in.IsActive,
 	).Scan(&in.ID, &in.CreatedAt, &in.UpdatedAt)
 	if err != nil {
 		return nil, err
@@ -294,8 +296,8 @@ func (s *Store) CreateRole(in *Role) (*Role, error) {
 
 func (s *Store) UpdateRole(id string, in *Role) (*Role, error) {
 	res, err := s.db.Exec(
-		`UPDATE roles SET module_id = $1, name = $2, description = $3, updated_at = now() WHERE id = $4`,
-		in.ModuleID, in.Name, in.Description, id,
+		`UPDATE roles SET module_id = $1, name = $2, description = $3, is_active = $4, updated_at = now() WHERE id = $5`,
+		in.ModuleID, in.Name, in.Description, in.IsActive, id,
 	)
 	if err != nil {
 		return nil, err

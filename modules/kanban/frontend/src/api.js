@@ -37,5 +37,5 @@ export const api = {
   listMembers: (boardId) => request(`boards/${boardId}/members`),
   addMember: (boardId, username) => request(`boards/${boardId}/members`, { method: 'POST', body: JSON.stringify({ username }) }),
   removeMember: (boardId, userId) => request(`boards/${boardId}/members/${userId}`, { method: 'DELETE' }),
-  listUsers: () => request('users'),
+  listUsers: () => request('users'), // also used for the card assignee picker
 }

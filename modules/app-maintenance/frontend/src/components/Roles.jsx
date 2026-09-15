@@ -45,6 +45,15 @@ export default function Roles() {
     load()
   }
 
+  // Deactivating (vs deleting) is reversible - anyone holding this role
+  // immediately stops getting the module access it grants at their next
+  // login (see app-maintenance's UserModules query), without losing the
+  // role assignment itself.
+  const toggleActive = async (role) => {
+    await api.updateRole(role.id, { ...role, isActive: !role.isActive })
+    load()
+  }
+
   const moduleName = (id) => modules.find((m) => m.id === id)?.name || id
 
   const q = filter.trim().toLowerCase()
@@ -115,6 +124,7 @@ export default function Roles() {
                 <th className="px-4 py-3 font-medium">{t('roles.colModule')}</th>
                 <th className="px-4 py-3 font-medium">{t('roles.colName')}</th>
                 <th className="px-4 py-3 font-medium">{t('roles.colDescription')}</th>
+                <th className="px-4 py-3 font-medium">{t('roles.colStatus')}</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -124,6 +134,13 @@ export default function Roles() {
                   <td className="px-4 py-3"><Badge variant="secondary">{moduleName(r.moduleId)}</Badge></td>
                   <td className="px-4 py-3 font-medium">{r.name}</td>
                   <td className="px-4 py-3 text-muted-foreground">{r.description}</td>
+                  <td className="px-4 py-3">
+                    <button onClick={() => toggleActive(r)} title={t('roles.toggleActiveHint')}>
+                      <Badge variant={r.isActive ? 'default' : 'secondary'} className="cursor-pointer">
+                        {r.isActive ? t('roles.active') : t('roles.inactive')}
+                      </Badge>
+                    </button>
+                  </td>
                   <td className="px-4 py-3 text-right">
                     <Button variant="ghost" size="icon" onClick={() => remove(r.id)}>
                       <Trash2 className="h-4 w-4 text-destructive" />
@@ -133,7 +150,7 @@ export default function Roles() {
               ))}
               {filteredRoles.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
                     {roles.length === 0 ? t('roles.noRoles') : t('common.noMatches')}
                   </td>
                 </tr>

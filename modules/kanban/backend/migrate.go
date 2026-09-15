@@ -56,8 +56,21 @@ CREATE TABLE IF NOT EXISTS cards (
 );
 `
 
-// migrate creates this module's schema (if missing) and its tables, then
-// seeds a starter board so the UI is usable right away.
+// alterSQL patches tables that already existed from an earlier version of
+// this schema (CREATE TABLE IF NOT EXISTS above is a no-op once a table
+// exists, so a new column needs its own idempotent statement here instead)
+// - same pattern as every other module's migrate.go. assignee_id has no FK
+// to app_maintenance.users, same loose-coupling reasoning as board_members.
+const alterSQL = `
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS assignee_id UUID;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS due_date TIMESTAMPTZ;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS color TEXT NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS cards_assignee_idx ON cards (assignee_id);
+`
+
+// migrate creates this module's schema (if missing) and its tables, patches
+// existing tables forward, then seeds a starter board so the UI is usable
+// right away.
 func migrate(db *sql.DB, schema string) error {
 	createSchema := fmt.Sprintf(`CREATE SCHEMA IF NOT EXISTS %s;`, quoteIdent(schema))
 	if _, err := db.Exec(createSchema); err != nil {
@@ -65,6 +78,9 @@ func migrate(db *sql.DB, schema string) error {
 	}
 	if _, err := db.Exec(schemaSQL); err != nil {
 		return fmt.Errorf("create tables: %w", err)
+	}
+	if _, err := db.Exec(alterSQL); err != nil {
+		return fmt.Errorf("alter tables: %w", err)
 	}
 	if err := seed(db); err != nil {
 		return fmt.Errorf("seed: %w", err)
