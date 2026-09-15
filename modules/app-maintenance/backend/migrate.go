@@ -122,6 +122,16 @@ CREATE TABLE IF NOT EXISTS audit.activity_log (
 CREATE INDEX IF NOT EXISTS activity_log_occurred_at_idx ON audit.activity_log (occurred_at DESC);
 `
 
+// auditAlterSQL patches audit.activity_log forward for deployments where
+// it already existed before request_id was added - same "CREATE TABLE IF
+// NOT EXISTS is a no-op, so a new column needs its own idempotent
+// statement" reasoning as alterSQL below, just for the audit schema
+// instead of this module's own.
+const auditAlterSQL = `
+ALTER TABLE audit.activity_log ADD COLUMN IF NOT EXISTS request_id TEXT NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS activity_log_request_id_idx ON audit.activity_log (request_id);
+`
+
 // migrate creates this module's schema (if missing) and its tables, patches
 // existing tables forward (see alterSQL), then seeds initial data so the UI
 // is usable right away.
@@ -135,6 +145,9 @@ func migrate(db *sql.DB, schema string) error {
 	}
 	if _, err := db.Exec(auditSchemaSQL); err != nil {
 		return fmt.Errorf("create audit schema: %w", err)
+	}
+	if _, err := db.Exec(auditAlterSQL); err != nil {
+		return fmt.Errorf("alter audit schema: %w", err)
 	}
 	if _, err := db.Exec(alterSQL); err != nil {
 		return fmt.Errorf("alter tables: %w", err)

@@ -1,3 +1,14 @@
+# Caps every container's own log file(s) so `docker logs` history can't
+# quietly eat disk forever - part of the observability/log-management pass
+# (2026-09-15). Not shareable across the files `include:` merges in (YAML
+# anchors don't cross documents), so the identical block is repeated as a
+# per-file anchor in every module's own docker-compose.yml too.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 networks:
   app-network:
     driver: bridge
@@ -23,6 +34,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    logging: *default-logging
     restart: unless-stopped
 
   portal-frontend:
@@ -30,6 +42,7 @@ services:
       context: ./portal/frontend
     networks:
       - app-network
+    logging: *default-logging
     restart: unless-stopped
 
   nginx:
@@ -42,6 +55,7 @@ services:
       - ./modules:/etc/nginx/modules:ro
     networks:
       - app-network
+    logging: *default-logging
     depends_on:
       - portal-frontend
       - app-maintenance-frontend

@@ -31,9 +31,9 @@ func writeAudit(db *sql.DB, r *http.Request, action, entityType, entityID string
 		}
 	}
 	_, err := db.Exec(
-		`INSERT INTO audit.activity_log (actor_user_id, actor_username, module_code, action, entity_type, entity_id, detail, ip_address)
-		 VALUES (NULLIF($1, '')::uuid, $2, 'my-storage', $3, $4, $5, $6, $7)`,
-		currentUserID(r), r.Header.Get("X-Username"), action, entityType, entityID, detailJSON, clientIP(r),
+		`INSERT INTO audit.activity_log (actor_user_id, actor_username, module_code, action, entity_type, entity_id, detail, ip_address, request_id)
+		 VALUES (NULLIF($1, '')::uuid, $2, 'my-storage', $3, $4, $5, $6, $7, $8)`,
+		currentUserID(r), r.Header.Get("X-Username"), action, entityType, entityID, detailJSON, clientIP(r), r.Header.Get("X-Request-Id"),
 	)
 	if err != nil {
 		log.Printf("audit log write failed: %v", err)

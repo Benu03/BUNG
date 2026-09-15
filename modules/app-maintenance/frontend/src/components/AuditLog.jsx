@@ -19,7 +19,7 @@ function actionVariant(action) {
 // Applied server-side (see api.listAuditLog) so "Load more" pagination
 // stays correct against the filtered set, not just the currently-loaded
 // page.
-const emptyRangeFilters = { from: '', to: '', user: '', ip: '' }
+const emptyRangeFilters = { from: '', to: '', user: '', ip: '', requestId: '' }
 
 export default function AuditLog() {
   const { t } = useTranslation()
@@ -37,6 +37,7 @@ export default function AuditLog() {
     to: f.to ? new Date(f.to) : null,
     user: f.user.trim(),
     ip: f.ip.trim(),
+    requestId: f.requestId.trim(),
   })
 
   const loadPage = async (nextOffset, filters = appliedFilters) => {
@@ -66,6 +67,16 @@ export default function AuditLog() {
     setRangeFilters(emptyRangeFilters)
     setAppliedFilters(emptyRangeFilters)
     loadPage(0, emptyRangeFilters)
+  }
+
+  // Clicking a row's Request ID traces just that one request - every
+  // entry (across every module) that shares it, i.e. everything that
+  // happened while nginx was handling that single request.
+  const traceRequest = (requestId) => {
+    const next = { ...emptyRangeFilters, requestId }
+    setRangeFilters(next)
+    setAppliedFilters(next)
+    loadPage(0, next)
   }
 
   // The free-text box still only filters what's already loaded
@@ -133,6 +144,15 @@ export default function AuditLog() {
               className="h-8 w-[140px] text-xs"
             />
           </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground">{t('auditLog.requestIdFilter')}</label>
+            <Input
+              placeholder={t('auditLog.requestIdFilter')}
+              value={rangeFilters.requestId}
+              onChange={(e) => setRangeFilters((f) => ({ ...f, requestId: e.target.value }))}
+              className="h-8 w-[160px] font-mono text-xs"
+            />
+          </div>
           <Button type="submit" size="sm" disabled={loading}>{t('auditLog.applyFilters')}</Button>
           <Button type="button" variant="outline" size="sm" onClick={clearFilters} disabled={loading}>
             {t('auditLog.clearFilters')}
@@ -148,6 +168,7 @@ export default function AuditLog() {
                 <th className="px-4 py-3 font-medium">{t('auditLog.action')}</th>
                 <th className="px-4 py-3 font-medium">{t('auditLog.entity')}</th>
                 <th className="px-4 py-3 font-medium">{t('auditLog.ip')}</th>
+                <th className="px-4 py-3 font-medium">{t('auditLog.requestId')}</th>
               </tr>
             </thead>
             <tbody>
@@ -161,11 +182,25 @@ export default function AuditLog() {
                     {e.entityType}{e.entityId ? ` #${e.entityId.slice(0, 8)}` : ''}
                   </td>
                   <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{e.ipAddress}</td>
+                  <td className="px-4 py-2.5">
+                    {e.requestId ? (
+                      <button
+                        type="button"
+                        onClick={() => traceRequest(e.requestId)}
+                        title={t('auditLog.traceRequestHint')}
+                        className="font-mono text-xs text-muted-foreground underline decoration-dotted hover:text-foreground"
+                      >
+                        {e.requestId.slice(0, 8)}
+                      </button>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </td>
                 </tr>
               ))}
               {filteredEntries.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                     {entries.length === 0 ? t('auditLog.noActivity') : t('common.noMatches')}
                   </td>
                 </tr>

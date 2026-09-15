@@ -29,6 +29,11 @@ type AuditEntry struct {
 	EntityID      string         `json:"entityId"`
 	Detail        map[string]any `json:"detail,omitempty"`
 	IPAddress     string         `json:"ipAddress"`
+	// RequestID ties this entry back to one nginx request (its $request_id,
+	// forwarded as X-Request-Id - see /nginx/auth-common.conf) - the same
+	// id shows up in nginx's access log and every backend's own logs for
+	// that request, so a user-reported problem can be traced end to end.
+	RequestID string `json:"requestId,omitempty"`
 }
 
 func (s *Store) InsertAuditLog(e *AuditEntry) error {
@@ -41,29 +46,30 @@ func (s *Store) InsertAuditLog(e *AuditEntry) error {
 		}
 	}
 	_, err := s.db.Exec(
-		`INSERT INTO audit.activity_log (actor_user_id, actor_username, module_code, action, entity_type, entity_id, detail, ip_address)
-		 VALUES (NULLIF($1, '')::uuid, $2, $3, $4, $5, $6, $7, $8)`,
-		e.ActorUserID, e.ActorUsername, e.ModuleCode, e.Action, e.EntityType, e.EntityID, detailJSON, e.IPAddress,
+		`INSERT INTO audit.activity_log (actor_user_id, actor_username, module_code, action, entity_type, entity_id, detail, ip_address, request_id)
+		 VALUES (NULLIF($1, '')::uuid, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		e.ActorUserID, e.ActorUsername, e.ModuleCode, e.Action, e.EntityType, e.EntityID, detailJSON, e.IPAddress, e.RequestID,
 	)
 	return err
 }
 
 // AuditFilter narrows ListAuditLog - every field is optional (zero value =
 // no constraint on that field). From/To bound occurred_at (inclusive);
-// ActorUsername and IPAddress are exact matches (the Activity Log tab's
-// dedicated filter fields, as opposed to the free-text client-side search
-// over action/module/entity in AuditLog.jsx).
+// ActorUsername, IPAddress and RequestID are exact matches (the Activity
+// Log tab's dedicated filter fields, as opposed to the free-text
+// client-side search over action/module/entity in AuditLog.jsx).
 type AuditFilter struct {
 	From          *time.Time
 	To            *time.Time
 	ActorUsername string
 	IPAddress     string
+	RequestID     string
 }
 
 func (s *Store) ListAuditLog(limit, offset int, f AuditFilter) ([]*AuditEntry, error) {
 	query := `
 		SELECT id, occurred_at, coalesce(actor_user_id::text, ''), actor_username,
-		       module_code, action, entity_type, entity_id, detail, ip_address
+		       module_code, action, entity_type, entity_id, detail, ip_address, request_id
 		FROM audit.activity_log
 		WHERE 1=1`
 	args := []any{}
@@ -84,6 +90,10 @@ func (s *Store) ListAuditLog(limit, offset int, f AuditFilter) ([]*AuditEntry, e
 		args = append(args, f.IPAddress)
 		query += fmt.Sprintf(" AND ip_address = $%d", len(args))
 	}
+	if f.RequestID != "" {
+		args = append(args, f.RequestID)
+		query += fmt.Sprintf(" AND request_id = $%d", len(args))
+	}
 
 	args = append(args, limit)
 	query += fmt.Sprintf(" ORDER BY occurred_at DESC LIMIT $%d", len(args))
@@ -101,7 +111,7 @@ func (s *Store) ListAuditLog(limit, offset int, f AuditFilter) ([]*AuditEntry, e
 		var e AuditEntry
 		var detailJSON []byte
 		if err := rows.Scan(&e.ID, &e.OccurredAt, &e.ActorUserID, &e.ActorUsername,
-			&e.ModuleCode, &e.Action, &e.EntityType, &e.EntityID, &detailJSON, &e.IPAddress); err != nil {
+			&e.ModuleCode, &e.Action, &e.EntityType, &e.EntityID, &detailJSON, &e.IPAddress, &e.RequestID); err != nil {
 			return nil, err
 		}
 		if len(detailJSON) > 0 {
@@ -136,6 +146,7 @@ func writeAudit(s *Store, r *http.Request, action, entityType, entityID string, 
 		EntityID:      entityID,
 		Detail:        detail,
 		IPAddress:     clientIP(r),
+		RequestID:     r.Header.Get("X-Request-Id"),
 	}
 	if err := s.InsertAuditLog(e); err != nil {
 		log.Printf("audit log write failed: %v", err)

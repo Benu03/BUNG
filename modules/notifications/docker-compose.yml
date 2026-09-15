@@ -1,3 +1,11 @@
+# Same log-rotation cap as the root docker-compose.yml - repeated per file
+# since YAML anchors don't cross the files `include:` merges in.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   notifications-frontend:
     build:
@@ -6,6 +14,7 @@ services:
         VITE_BASE: ${NOTIFICATIONS_VITE_BASE:-/notifications/}
     networks:
       - app-network
+    logging: *default-logging
     restart: unless-stopped
 
   notifications-backend:
@@ -22,6 +31,7 @@ services:
       - DB_SSLMODE=disable
     networks:
       - app-network
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy

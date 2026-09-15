@@ -188,16 +188,18 @@ func (a *authAPI) login(w http.ResponseWriter, r *http.Request) {
 	ip := clientIP(r)
 	limitKey := in.Username + "|" + ip
 
+	requestID := r.Header.Get("X-Request-Id")
+
 	if blocked, retryAfter := a.limiter.blocked(limitKey); blocked {
 		minutes := int(retryAfter.Minutes()) + 1
-		a.audit("auth.login_blocked", "user", "", in.Username, ip)
+		a.audit("auth.login_blocked", "user", "", in.Username, ip, requestID)
 		writeErr(w, http.StatusTooManyRequests, fmt.Sprintf("too many failed attempts, try again in %d minute(s)", minutes))
 		return
 	}
 
 	fail := func(msg string) {
 		a.limiter.recordFailure(limitKey)
-		a.audit("auth.login_failed", "user", "", in.Username, ip)
+		a.audit("auth.login_failed", "user", "", in.Username, ip, requestID)
 		writeErr(w, http.StatusUnauthorized, msg)
 	}
 
@@ -237,7 +239,7 @@ func (a *authAPI) login(w http.ResponseWriter, r *http.Request) {
 	}
 	a.limiter.recordSuccess(limitKey)
 	a.setSessionCookie(w, token)
-	a.audit("auth.login", "user", user.ID, user.Username, ip)
+	a.audit("auth.login", "user", user.ID, user.Username, ip, requestID)
 	writeJSON(w, http.StatusOK, &AuthUser{
 		ID: user.ID, Username: user.Username, FullName: user.FullName, Email: user.Email,
 		Modules: modules, MustChangePassword: mustChange,
@@ -247,7 +249,7 @@ func (a *authAPI) login(w http.ResponseWriter, r *http.Request) {
 // audit is a small helper for the auth endpoints, which run outside
 // nginx's auth_request gate (see nginx.conf) and so don't have
 // X-User-Id/X-Username headers to read like writeAudit (handlers.go) does.
-func (a *authAPI) audit(action, entityType, entityID, username, ip string) {
+func (a *authAPI) audit(action, entityType, entityID, username, ip, requestID string) {
 	e := &AuditEntry{
 		ActorUserID:   entityID,
 		ActorUsername: username,
@@ -256,6 +258,7 @@ func (a *authAPI) audit(action, entityType, entityID, username, ip string) {
 		EntityType:    entityType,
 		EntityID:      entityID,
 		IPAddress:     ip,
+		RequestID:     requestID,
 	}
 	if err := a.store.InsertAuditLog(e); err != nil {
 		log.Printf("audit log write failed: %v", err)
@@ -377,7 +380,7 @@ func (a *authAPI) changePassword(w http.ResponseWriter, r *http.Request) {
 		handleErr(w, err)
 		return
 	}
-	a.audit("auth.change_password", "user", user.ID, user.Username, clientIP(r))
+	a.audit("auth.change_password", "user", user.ID, user.Username, clientIP(r), r.Header.Get("X-Request-Id"))
 
 	// Re-issue the session so MustChangePassword clears immediately,
 	// instead of waiting for the old token to expire.
@@ -454,7 +457,7 @@ func (a *authAPI) forgotPassword(w http.ResponseWriter, r *http.Request) {
 	if err := a.emailSender.Send(user.Email, "Reset your password", body); err != nil {
 		log.Printf("send reset email: %v", err)
 	}
-	a.audit("auth.forgot_password", "user", user.ID, user.Username, clientIP(r))
+	a.audit("auth.forgot_password", "user", user.ID, user.Username, clientIP(r), r.Header.Get("X-Request-Id"))
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": genericMsg})
 }
@@ -494,7 +497,7 @@ func (a *authAPI) resetPassword(w http.ResponseWriter, r *http.Request) {
 		handleErr(w, err)
 		return
 	}
-	a.audit("auth.password_reset", "user", userID, "", clientIP(r))
+	a.audit("auth.password_reset", "user", userID, "", clientIP(r), r.Header.Get("X-Request-Id"))
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Password updated - you can now sign in."})
 }

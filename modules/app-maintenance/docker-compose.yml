@@ -1,3 +1,11 @@
+# Same log-rotation cap as the root docker-compose.yml - repeated per file
+# since YAML anchors don't cross the files `include:` merges in.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   app-maintenance-frontend:
     build:
@@ -6,6 +14,7 @@ services:
         VITE_BASE: ${APP_MAINTENANCE_VITE_BASE:-/app-maintenance/}
     networks:
       - app-network
+    logging: *default-logging
     restart: unless-stopped
 
   app-maintenance-backend:
@@ -31,6 +40,7 @@ services:
       - SMTP_FROM=${SMTP_FROM:-no-reply@bung.local}
     networks:
       - app-network
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy

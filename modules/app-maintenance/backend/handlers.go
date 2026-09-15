@@ -342,9 +342,11 @@ func (a *api) getPublicSettings(w http.ResponseWriter, r *http.Request) {
 // ---- audit log ----
 
 // listAuditLog supports optional ?from=&to= (RFC3339, bounding
-// occurred_at), ?user= (exact actor_username) and ?ip= (exact ip_address)
-// filters, applied server-side (so "load more" pagination stays correct
-// against the filtered set) - on top of ?limit=&offset=.
+// occurred_at), ?user= (exact actor_username), ?ip= (exact ip_address) and
+// ?requestId= (exact request_id, for tracing one specific request across
+// nginx's access log and every backend's own logs) filters, applied
+// server-side (so "load more" pagination stays correct against the
+// filtered set) - on top of ?limit=&offset=.
 func (a *api) listAuditLog(w http.ResponseWriter, r *http.Request) {
 	limit := queryInt(r, "limit", 50, 200)
 	offset := queryInt(r, "offset", 0, 1_000_000)
@@ -368,6 +370,7 @@ func (a *api) listAuditLog(w http.ResponseWriter, r *http.Request) {
 	}
 	filter.ActorUsername = r.URL.Query().Get("user")
 	filter.IPAddress = r.URL.Query().Get("ip")
+	filter.RequestID = r.URL.Query().Get("requestId")
 
 	entries, err := a.store.ListAuditLog(limit, offset, filter)
 	if err != nil {
