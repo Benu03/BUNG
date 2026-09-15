@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  Bell, CalendarDays, FolderOpen, LayoutGrid, Megaphone, PackageOpen, Search, Settings, Star, Ticket,
+  Bell, CalendarDays, FolderOpen, LayoutGrid, Megaphone, MessageCircle, PackageOpen, Search, Settings, Star, Ticket,
 } from 'lucide-react'
 import { Input } from './ui/input.jsx'
 import { Card } from './ui/card.jsx'
@@ -58,6 +58,7 @@ const MODULE_ICONS = {
   calendar: CalendarDays,
   ticketing: Ticket,
   notifications: Bell,
+  chat: MessageCircle,
 }
 
 function initials(name) {

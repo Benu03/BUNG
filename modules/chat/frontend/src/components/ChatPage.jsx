@@ -27,13 +27,21 @@ export default function ChatPage({ me }) {
   const selectedConversationRef = useRef(null)
   selectedConversationRef.current = view === 'chat' ? selectedConversationId : null
 
+  // NOTE: these must actually return their promises - callers `await` them
+  // (e.g. startConversation waits for the fresh list before opening the
+  // thread). An earlier version of this function had no `return`, so the
+  // `await` resolved immediately without waiting for the fetch, racing
+  // against the just-created conversation not being in state yet - showed
+  // up as a blank thread the first time you started a new personal chat.
   const refreshFriends = useCallback(() => {
-    api.listFriends().then(setFriends).catch(() => {})
-    api.listFriendRequests().then(setFriendRequests).catch(() => {})
+    return Promise.all([
+      api.listFriends().then(setFriends).catch(() => {}),
+      api.listFriendRequests().then(setFriendRequests).catch(() => {}),
+    ])
   }, [])
 
   const refreshConversations = useCallback(() => {
-    api.listConversations().then(setConversations).catch(() => {})
+    return api.listConversations().then(setConversations).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -103,7 +111,15 @@ export default function ChatPage({ me }) {
 
   const startConversation = async (userId) => {
     const { id } = await api.startConversation(userId)
-    await refreshConversations()
+    // Insert the new conversation into state immediately from data we
+    // already have (the friends list), rather than relying solely on a
+    // refetch racing against openConversation below.
+    setConversations((prev) => {
+      if (prev.some((c) => c.id === id)) return prev
+      const friend = friends.find((f) => f.id === userId) || { id: userId, username: '', fullName: '' }
+      return [{ id, friend, lastMessage: null, unreadCount: 0, createdAt: new Date().toISOString() }, ...prev]
+    })
+    refreshConversations() // reconcile with the server in the background
     await openConversation(id)
   }
 

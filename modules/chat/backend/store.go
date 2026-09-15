@@ -421,7 +421,11 @@ func (s *Store) ListMessages(userID, conversationID string, limit int) ([]*Messa
 	}
 	defer rows.Close()
 
-	var messages []*Message
+	// Initialized (not `var messages []*Message`) so a conversation with
+	// zero messages yet serializes as `[]`, not `null` - the frontend
+	// calls .map()/.length on this without a null-guard, same as every
+	// other list endpoint here.
+	messages := []*Message{}
 	for rows.Next() {
 		m, err := scanMessage(rows)
 		if err != nil {

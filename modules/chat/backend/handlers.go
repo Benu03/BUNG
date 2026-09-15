@@ -332,8 +332,10 @@ func (a *api) listBroadcasts(w http.ResponseWriter, r *http.Request) {
 }
 
 // createBroadcast is restricted to app-maintenance admins - checked here
-// (cross-schema), not at the nginx gateway, since chat's own gateway
-// route is deliberately open to any logged-in user (see nginx.conf).
+// (cross-schema), not at the nginx gateway. The gateway only confirms the
+// caller has the "chat" module at all (see nginx.conf) - broadcasting to
+// everyone is a stricter, separate permission on top of that, so it's
+// enforced in-handler regardless of module grants.
 func (a *api) createBroadcast(w http.ResponseWriter, r *http.Request) {
 	userID := currentUserID(r)
 	isAdmin, err := a.store.IsAppMaintenanceAdmin(userID)

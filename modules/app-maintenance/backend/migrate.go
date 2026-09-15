@@ -224,6 +224,7 @@ func seed(db *sql.DB) error {
 		{"my-storage", "My Storage", "Your private files"},
 		{"calendar", "Calendar", "Personal events and schedule"},
 		{"ticketing", "Ticketing", "Support tickets and requests"},
+		{"chat", "Chat", "Team messaging, friends and broadcasts"},
 	}
 
 	var userCount int
