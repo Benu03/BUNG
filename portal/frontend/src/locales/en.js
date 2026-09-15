@@ -15,6 +15,8 @@ export default {
     optional: 'optional',
     noModulesYet: 'No modules yet.',
     yourPrivateData: 'Only visible to you - private per account.',
+    filterPlaceholder: 'Filter...',
+    noMatches: 'No matches for your filter.',
   },
   login: {
     signIn: 'Sign in',
@@ -31,6 +33,8 @@ export default {
     noModulesAssigned: 'No modules assigned yet',
     askAdmin: 'Ask an administrator to assign a role with module access to your account.',
     changePassword: 'Change password',
+    addFavorite: 'Add to favorites',
+    removeFavorite: 'Remove from favorites',
   },
   forgotPassword: {
     title: 'Reset your password',

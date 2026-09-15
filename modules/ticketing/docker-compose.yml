@@ -1,0 +1,36 @@
+services:
+  ticketing-frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_BASE: ${TICKETING_VITE_BASE:-/ticketing/}
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  ticketing-backend:
+    build:
+      context: ./backend
+    environment:
+      - PORT=${TICKETING_BACKEND_PORT:-8080}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-bung}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-bung}
+      - DB_NAME=${POSTGRES_DB:-bung}
+      - DB_SCHEMA=${TICKETING_DB_SCHEMA:-ticketing}
+      - DB_SSLMODE=disable
+    networks:
+      - app-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      # Reads app_maintenance.users directly (cross-schema, for the
+      # requester/assignee picker - see store.go's ListAllUsers).
+      app-maintenance-backend:
+        condition: service_started
+      # Assigning/commenting notifies users (cross-schema write into
+      # notifications.inbox, see notify.go) - that schema must exist first.
+      notifications-backend:
+        condition: service_started
+    restart: unless-stopped

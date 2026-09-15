@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { ArrowLeft, CalendarDays, LogOut } from 'lucide-react'
 import EventsPage from './components/EventsPage.jsx'
 import Logo from './components/Logo.jsx'
@@ -5,10 +6,14 @@ import ThemeToggle from './components/ThemeToggle.jsx'
 import LanguageToggle from './components/LanguageToggle.jsx'
 import NotificationBell from './components/NotificationBell.jsx'
 import { Button } from './components/ui/button.jsx'
+import { api } from './api.js'
 import { useTranslation } from './lib/i18n.jsx'
 
 export default function App() {
   const { t } = useTranslation()
+  const [me, setMe] = useState(null)
+
+  useEffect(() => { api.me().then(setMe).catch(() => {}) }, [])
 
   // Auth (login/logout/session) is owned entirely by app-maintenance (see
   // /nginx/auth-common.conf) - this module never implements its own.
@@ -50,7 +55,7 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-4xl px-4 py-8">
-        <EventsPage />
+        <EventsPage me={me} />
       </main>
     </div>
   )

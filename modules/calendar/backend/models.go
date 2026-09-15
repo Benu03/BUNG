@@ -28,3 +28,22 @@ type eventRequest struct {
 	EndAt       time.Time `json:"endAt"`
 	AllDay      bool      `json:"allDay"`
 }
+
+// AttendeeRef is a minimal, read-only view of an invited user - same
+// cross-schema-lookup pattern as kanban's BoardMember.
+type AttendeeRef struct {
+	UserID   string `json:"userId"`
+	Username string `json:"username"`
+	FullName string `json:"fullName"`
+}
+
+// eventDetail is what GET /events/{id} returns - the event plus its
+// attendee list in one round trip.
+type eventDetail struct {
+	*Event
+	Attendees []*AttendeeRef `json:"attendees"`
+}
+
+type inviteRequest struct {
+	Username string `json:"username"`
+}

@@ -10,6 +10,21 @@ import { Badge } from './ui/badge.jsx'
 import { cn } from '../lib/utils.js'
 import { useTranslation } from '../lib/i18n.jsx'
 
+// Every seeded role is literally named "Administrator" (one per module),
+// so a plain role-name badge just repeats "Administrator" N times with no
+// way to tell which module is which at a glance - a pastel color per
+// module (cycling, same idea as the portal dashboard's module icons) plus
+// leading with the module's name fixes that; the role name only tags
+// along when it's something other than the generic default.
+const MODULE_BADGE_STYLES = [
+  'bg-violet-100 text-violet-700',
+  'bg-sky-100 text-sky-700',
+  'bg-amber-100 text-amber-700',
+  'bg-emerald-100 text-emerald-700',
+  'bg-rose-100 text-rose-700',
+  'bg-indigo-100 text-indigo-700',
+]
+
 export default function Users() {
   const { t } = useTranslation()
   const [users, setUsers] = useState([])
@@ -73,6 +88,10 @@ export default function Users() {
   const roleName = (id) => roles.find((r) => r.id === id)?.name || id
   const moduleName = (id) => modules.find((m) => m.id === id)?.name || id
   const rolesForModule = (moduleId) => roles.filter((r) => r.moduleId === moduleId)
+  const moduleBadgeStyle = (moduleId) => {
+    const idx = modules.findIndex((m) => m.id === moduleId)
+    return MODULE_BADGE_STYLES[idx < 0 ? 0 : idx % MODULE_BADGE_STYLES.length]
+  }
 
   const q = filter.trim().toLowerCase()
   const filteredUsers = q
@@ -155,11 +174,21 @@ export default function Users() {
                     <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
-                        {u.roleIds.map((id) => (
-                          <Badge key={id} variant="secondary" title={moduleName(roles.find((r) => r.id === id)?.moduleId)}>
-                            {roleName(id)}
-                          </Badge>
-                        ))}
+                        {u.roleIds.map((id) => {
+                          const role = roles.find((r) => r.id === id)
+                          return (
+                            <Badge
+                              key={id}
+                              variant="outline"
+                              className={cn('border-transparent font-medium', moduleBadgeStyle(role?.moduleId))}
+                            >
+                              {moduleName(role?.moduleId)}
+                              {role?.name && role.name !== 'Administrator' && (
+                                <span className="ml-1 opacity-70">· {role.name}</span>
+                              )}
+                            </Badge>
+                          )
+                        })}
                         {u.roleIds.length === 0 && <span className="text-xs text-muted-foreground">{t('users.noRolesBadge')}</span>}
                       </div>
 

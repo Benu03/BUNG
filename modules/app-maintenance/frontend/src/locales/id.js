@@ -104,6 +104,12 @@ export default {
     noActivity: 'Belum ada aktivitas.',
     loadMore: 'Muat lagi',
     loading: 'Memuat...',
+    from: 'Dari',
+    to: 'Sampai',
+    userFilter: 'Pengguna',
+    ipFilter: 'Alamat IP',
+    applyFilters: 'Terapkan',
+    clearFilters: 'Bersihkan',
   },
   bell: {
     title: 'Notifikasi',

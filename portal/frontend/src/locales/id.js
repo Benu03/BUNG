@@ -15,6 +15,8 @@ export default {
     optional: 'opsional',
     noModulesYet: 'Belum ada module.',
     yourPrivateData: 'Hanya bisa dilihat oleh kamu - privat per akun.',
+    filterPlaceholder: 'Filter...',
+    noMatches: 'Tidak ada yang cocok dengan filter.',
   },
   login: {
     signIn: 'Masuk',
@@ -31,6 +33,8 @@ export default {
     noModulesAssigned: 'Belum ada module yang diberikan',
     askAdmin: 'Minta administrator untuk memberi role dengan akses module ke akun kamu.',
     changePassword: 'Ganti kata sandi',
+    addFavorite: 'Tambah ke favorit',
+    removeFavorite: 'Hapus dari favorit',
   },
   forgotPassword: {
     title: 'Reset kata sandi',

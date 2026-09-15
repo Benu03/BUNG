@@ -17,6 +17,8 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  me: () => request('me'),
+
   // from/to are optional Date objects (RFC3339 on the wire) - omit both to
   // get every event.
   listEvents: (from, to) => {
@@ -26,7 +28,12 @@ export const api = {
     const qs = params.toString()
     return request(`events${qs ? `?${qs}` : ''}`)
   },
+  // Full detail (includes attendees) - fetched when opening the edit modal.
+  getEvent: (id) => request(`events/${id}`),
   createEvent: (data) => request('events', { method: 'POST', body: JSON.stringify(data) }),
   updateEvent: (id, data) => request(`events/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteEvent: (id) => request(`events/${id}`, { method: 'DELETE' }),
+
+  inviteAttendee: (id, username) => request(`events/${id}/invite`, { method: 'POST', body: JSON.stringify({ username }) }),
+  removeAttendee: (id, userId) => request(`events/${id}/invite/${userId}`, { method: 'DELETE' }),
 }

@@ -26,6 +26,22 @@ CREATE TABLE IF NOT EXISTS events (
 );
 
 CREATE INDEX IF NOT EXISTS events_owner_start_idx ON events (owner_id, start_at);
+
+-- Invited attendees, added by the event's owner - lets an event "invite
+-- anyone" (see store.go's Invite/RemoveAttendee): an invited user sees the
+-- event in their own calendar too (List includes owned OR invited-to
+-- events), and gets a notification. Only the owner can invite/remove
+-- attendees or edit/delete the event; attendees can view but not edit -
+-- same asymmetry as kanban's board owner vs member.
+CREATE TABLE IF NOT EXISTS event_attendees (
+	event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+	user_id UUID NOT NULL,
+	invited_by UUID NOT NULL,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	PRIMARY KEY (event_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS event_attendees_user_idx ON event_attendees (user_id);
 `
 
 // migrate creates this module's schema (if missing) and its tables. No seed

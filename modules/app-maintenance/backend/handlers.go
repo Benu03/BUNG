@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 type api struct {
@@ -323,10 +324,35 @@ func (a *api) getPublicSettings(w http.ResponseWriter, r *http.Request) {
 
 // ---- audit log ----
 
+// listAuditLog supports optional ?from=&to= (RFC3339, bounding
+// occurred_at), ?user= (exact actor_username) and ?ip= (exact ip_address)
+// filters, applied server-side (so "load more" pagination stays correct
+// against the filtered set) - on top of ?limit=&offset=.
 func (a *api) listAuditLog(w http.ResponseWriter, r *http.Request) {
 	limit := queryInt(r, "limit", 50, 200)
 	offset := queryInt(r, "offset", 0, 1_000_000)
-	entries, err := a.store.ListAuditLog(limit, offset)
+
+	var filter AuditFilter
+	if v := r.URL.Query().Get("from"); v != "" {
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, "invalid from")
+			return
+		}
+		filter.From = &t
+	}
+	if v := r.URL.Query().Get("to"); v != "" {
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, "invalid to")
+			return
+		}
+		filter.To = &t
+	}
+	filter.ActorUsername = r.URL.Query().Get("user")
+	filter.IPAddress = r.URL.Query().Get("ip")
+
+	entries, err := a.store.ListAuditLog(limit, offset, filter)
 	if err != nil {
 		handleErr(w, err)
 		return

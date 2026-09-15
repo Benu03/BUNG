@@ -16,6 +16,11 @@ function actionVariant(action) {
   return 'secondary'
 }
 
+// Applied server-side (see api.listAuditLog) so "Load more" pagination
+// stays correct against the filtered set, not just the currently-loaded
+// page.
+const emptyRangeFilters = { from: '', to: '', user: '', ip: '' }
+
 export default function AuditLog() {
   const { t } = useTranslation()
   const [entries, setEntries] = useState([])
@@ -24,12 +29,21 @@ export default function AuditLog() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [filter, setFilter] = useState('')
+  const [rangeFilters, setRangeFilters] = useState(emptyRangeFilters)
+  const [appliedFilters, setAppliedFilters] = useState(emptyRangeFilters)
 
-  const loadPage = async (nextOffset) => {
+  const toApiFilters = (f) => ({
+    from: f.from ? new Date(f.from) : null,
+    to: f.to ? new Date(f.to) : null,
+    user: f.user.trim(),
+    ip: f.ip.trim(),
+  })
+
+  const loadPage = async (nextOffset, filters = appliedFilters) => {
     setLoading(true)
     setError('')
     try {
-      const page = await api.listAuditLog(PAGE_SIZE, nextOffset)
+      const page = await api.listAuditLog(PAGE_SIZE, nextOffset, toApiFilters(filters))
       setEntries((prev) => (nextOffset === 0 ? page : [...prev, ...page]))
       setHasMore(page.length === PAGE_SIZE)
       setOffset(nextOffset + page.length)
@@ -40,10 +54,23 @@ export default function AuditLog() {
     }
   }
 
-  useEffect(() => { loadPage(0) }, [])
+  useEffect(() => { loadPage(0, emptyRangeFilters) }, [])
 
-  // Filters only what's already loaded (client-side) - "Load more" still
-  // fetches the next raw page from the server regardless of the filter.
+  const applyFilters = (e) => {
+    e.preventDefault()
+    setAppliedFilters(rangeFilters)
+    loadPage(0, rangeFilters)
+  }
+
+  const clearFilters = () => {
+    setRangeFilters(emptyRangeFilters)
+    setAppliedFilters(emptyRangeFilters)
+    loadPage(0, emptyRangeFilters)
+  }
+
+  // The free-text box still only filters what's already loaded
+  // (client-side, cheap) - action/module/entity are rarely worth a
+  // server round trip the way a time range or actor/IP is.
   const q = filter.trim().toLowerCase()
   const filteredEntries = q
     ? entries.filter((e) => [e.actorUsername, e.moduleCode, e.action, e.entityType].some((v) => v?.toLowerCase().includes(q)))
@@ -68,6 +95,49 @@ export default function AuditLog() {
             className="h-8 max-w-xs border-0 shadow-none focus-visible:ring-0"
           />
         </div>
+
+        <form onSubmit={applyFilters} className="flex flex-wrap items-end gap-3 border-b bg-muted/20 p-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground">{t('auditLog.from')}</label>
+            <Input
+              type="datetime-local"
+              value={rangeFilters.from}
+              onChange={(e) => setRangeFilters((f) => ({ ...f, from: e.target.value }))}
+              className="h-8 w-[190px] text-xs"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground">{t('auditLog.to')}</label>
+            <Input
+              type="datetime-local"
+              value={rangeFilters.to}
+              onChange={(e) => setRangeFilters((f) => ({ ...f, to: e.target.value }))}
+              className="h-8 w-[190px] text-xs"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground">{t('auditLog.userFilter')}</label>
+            <Input
+              placeholder={t('auditLog.userFilter')}
+              value={rangeFilters.user}
+              onChange={(e) => setRangeFilters((f) => ({ ...f, user: e.target.value }))}
+              className="h-8 w-[140px] text-xs"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground">{t('auditLog.ipFilter')}</label>
+            <Input
+              placeholder={t('auditLog.ipFilter')}
+              value={rangeFilters.ip}
+              onChange={(e) => setRangeFilters((f) => ({ ...f, ip: e.target.value }))}
+              className="h-8 w-[140px] text-xs"
+            />
+          </div>
+          <Button type="submit" size="sm" disabled={loading}>{t('auditLog.applyFilters')}</Button>
+          <Button type="button" variant="outline" size="sm" onClick={clearFilters} disabled={loading}>
+            {t('auditLog.clearFilters')}
+          </Button>
+        </form>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

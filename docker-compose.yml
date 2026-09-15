@@ -54,6 +54,8 @@ services:
       - notifications-backend
       - calendar-frontend
       - calendar-backend
+      - ticketing-frontend
+      - ticketing-backend
     restart: unless-stopped
 
 # Every module shares this one Postgres instance/database, but lives in its
@@ -83,3 +85,4 @@ include:
   - modules/my-storage/docker-compose.yml
   - modules/notifications/docker-compose.yml
   - modules/calendar/docker-compose.yml
+  - modules/ticketing/docker-compose.yml

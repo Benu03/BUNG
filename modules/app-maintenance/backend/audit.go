@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -47,13 +48,49 @@ func (s *Store) InsertAuditLog(e *AuditEntry) error {
 	return err
 }
 
-func (s *Store) ListAuditLog(limit, offset int) ([]*AuditEntry, error) {
-	rows, err := s.db.Query(`
+// AuditFilter narrows ListAuditLog - every field is optional (zero value =
+// no constraint on that field). From/To bound occurred_at (inclusive);
+// ActorUsername and IPAddress are exact matches (the Activity Log tab's
+// dedicated filter fields, as opposed to the free-text client-side search
+// over action/module/entity in AuditLog.jsx).
+type AuditFilter struct {
+	From          *time.Time
+	To            *time.Time
+	ActorUsername string
+	IPAddress     string
+}
+
+func (s *Store) ListAuditLog(limit, offset int, f AuditFilter) ([]*AuditEntry, error) {
+	query := `
 		SELECT id, occurred_at, coalesce(actor_user_id::text, ''), actor_username,
 		       module_code, action, entity_type, entity_id, detail, ip_address
 		FROM audit.activity_log
-		ORDER BY occurred_at DESC
-		LIMIT $1 OFFSET $2`, limit, offset)
+		WHERE 1=1`
+	args := []any{}
+
+	if f.From != nil {
+		args = append(args, *f.From)
+		query += fmt.Sprintf(" AND occurred_at >= $%d", len(args))
+	}
+	if f.To != nil {
+		args = append(args, *f.To)
+		query += fmt.Sprintf(" AND occurred_at <= $%d", len(args))
+	}
+	if f.ActorUsername != "" {
+		args = append(args, f.ActorUsername)
+		query += fmt.Sprintf(" AND actor_username = $%d", len(args))
+	}
+	if f.IPAddress != "" {
+		args = append(args, f.IPAddress)
+		query += fmt.Sprintf(" AND ip_address = $%d", len(args))
+	}
+
+	args = append(args, limit)
+	query += fmt.Sprintf(" ORDER BY occurred_at DESC LIMIT $%d", len(args))
+	args = append(args, offset)
+	query += fmt.Sprintf(" OFFSET $%d", len(args))
+
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}

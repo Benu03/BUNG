@@ -104,6 +104,12 @@ export default {
     noActivity: 'No activity yet.',
     loadMore: 'Load more',
     loading: 'Loading...',
+    from: 'From',
+    to: 'To',
+    userFilter: 'User',
+    ipFilter: 'IP address',
+    applyFilters: 'Apply',
+    clearFilters: 'Clear',
   },
   bell: {
     title: 'Notifications',

@@ -209,6 +209,7 @@ func seed(db *sql.DB) error {
 		{"kanban", "Kanban", "Boards, columns and cards"},
 		{"my-storage", "My Storage", "Your private files"},
 		{"calendar", "Calendar", "Personal events and schedule"},
+		{"ticketing", "Ticketing", "Support tickets and requests"},
 	}
 
 	var userCount int

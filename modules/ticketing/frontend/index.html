@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <title>Ticketing</title>
+    <script>
+      // Set the theme attribute before first paint, so the page never
+      // flashes the wrong theme. Default is always "light" - this only
+      // reads a previous explicit choice from the toggle, never the
+      // OS/browser preference (see ThemeToggle.jsx).
+      (function () {
+        var theme = localStorage.getItem('bung-theme') || 'light'
+        document.documentElement.setAttribute('data-theme', theme)
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

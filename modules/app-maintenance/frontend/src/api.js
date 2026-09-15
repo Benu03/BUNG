@@ -41,6 +41,14 @@ export const api = {
   getSettings: () => request('settings'),
   updateSettings: (data) => request('settings', { method: 'PUT', body: JSON.stringify(data) }),
 
-  // audit log
-  listAuditLog: (limit, offset) => request(`audit-log?limit=${limit}&offset=${offset}`),
+  // audit log - filters is an optional { from, to, user, ip } object;
+  // from/to are Date objects (sent as RFC3339), user/ip are exact matches.
+  listAuditLog: (limit, offset, filters = {}) => {
+    const params = new URLSearchParams({ limit, offset })
+    if (filters.from) params.set('from', filters.from.toISOString())
+    if (filters.to) params.set('to', filters.to.toISOString())
+    if (filters.user) params.set('user', filters.user)
+    if (filters.ip) params.set('ip', filters.ip)
+    return request(`audit-log?${params.toString()}`)
+  },
 }

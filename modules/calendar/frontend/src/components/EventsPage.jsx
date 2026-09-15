@@ -24,7 +24,7 @@ function formatTimeRange(ev) {
   return `${new Date(ev.startAt).toLocaleTimeString([], opts)} - ${new Date(ev.endAt).toLocaleTimeString([], opts)}`
 }
 
-export default function EventsPage() {
+export default function EventsPage({ me }) {
   const { t, lang } = useTranslation()
   const [events, setEvents] = useState([])
   const [error, setError] = useState('')
@@ -109,7 +109,14 @@ export default function EventsPage() {
                   onClick={() => setModalEvent(ev)}
                   className="flex w-full flex-col gap-1 px-4 py-3 text-left hover:bg-muted/40"
                 >
-                  <span className="font-medium">{ev.title}</span>
+                  <span className="flex items-center gap-2 font-medium">
+                    {ev.title}
+                    {me && ev.ownerId !== me.id && (
+                      <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
+                        {t('events.invited')}
+                      </span>
+                    )}
+                  </span>
                   <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
@@ -134,6 +141,7 @@ export default function EventsPage() {
       {modalEvent !== undefined && (
         <EventModal
           event={modalEvent}
+          me={me}
           onClose={() => setModalEvent(undefined)}
           onSaved={onSaved}
           onDeleted={onDeleted}

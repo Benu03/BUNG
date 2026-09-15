@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -32,6 +33,10 @@ func handleErr(w http.ResponseWriter, err error) {
 		writeErr(w, http.StatusNotFound, "not found")
 		return
 	}
+	if errors.Is(err, ErrForbidden) {
+		writeErr(w, http.StatusForbidden, "forbidden")
+		return
+	}
 	log.Printf("internal error: %v", err)
 	writeErr(w, http.StatusInternalServerError, "internal error")
 }
@@ -46,6 +51,13 @@ func currentUserID(r *http.Request) string {
 
 func (a *api) health(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "module": "calendar"})
+}
+
+// me echoes back the identity nginx's auth_request already attached to the
+// request, so the frontend can tell who's logged in - e.g. whether they
+// own an event they can see (same pattern as kanban's /me).
+func (a *api) me(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{"id": currentUserID(r), "username": r.Header.Get("X-Username")})
 }
 
 // parseTimeParam parses an RFC3339 query param, returning nil if absent.
@@ -84,12 +96,18 @@ func (a *api) list(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *api) get(w http.ResponseWriter, r *http.Request) {
-	e, err := a.store.Get(currentUserID(r), r.PathValue("id"))
+	id := r.PathValue("id")
+	e, err := a.store.Get(currentUserID(r), id)
 	if err != nil {
 		handleErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, e)
+	attendees, err := a.store.ListAttendees(id)
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, &eventDetail{Event: e, Attendees: attendees})
 }
 
 func validateEventRequest(in *eventRequest) string {
@@ -150,5 +168,45 @@ func (a *api) delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeAudit(a.store.db, r, "event.delete", "event", id, nil)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ---- attendees ----
+
+func (a *api) invite(w http.ResponseWriter, r *http.Request) {
+	eventID := r.PathValue("id")
+	var in inviteRequest
+	if err := decodeJSON(r, &in); err != nil || in.Username == "" {
+		writeErr(w, http.StatusBadRequest, "username is required")
+		return
+	}
+
+	attendee, err := a.store.Invite(currentUserID(r), eventID, in.Username)
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+
+	e, err := a.store.Get(currentUserID(r), eventID)
+	if err == nil {
+		notify(a.store.db, attendee.UserID, "calendar", "event.invited",
+			"You were invited to an event",
+			fmt.Sprintf("You were invited to %q.", e.Title),
+			"/calendar/",
+		)
+	}
+
+	writeAudit(a.store.db, r, "event.invite", "event", eventID, map[string]any{"username": attendee.Username})
+	writeJSON(w, http.StatusCreated, attendee)
+}
+
+func (a *api) removeAttendee(w http.ResponseWriter, r *http.Request) {
+	eventID := r.PathValue("id")
+	userID := r.PathValue("userId")
+	if err := a.store.RemoveAttendee(currentUserID(r), eventID, userID); err != nil {
+		handleErr(w, err)
+		return
+	}
+	writeAudit(a.store.db, r, "event.uninvite", "event", eventID, map[string]any{"userId": userID})
 	w.WriteHeader(http.StatusNoContent)
 }

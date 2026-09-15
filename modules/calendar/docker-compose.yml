@@ -25,4 +25,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      # Invite looks up users by username (cross-schema, see store.go's
+      # Invite/ListAttendees).
+      app-maintenance-backend:
+        condition: service_started
+      # Inviting someone notifies them (cross-schema write into
+      # notifications.inbox, see notify.go) - that schema must exist first.
+      notifications-backend:
+        condition: service_started
     restart: unless-stopped
