@@ -2,6 +2,9 @@ export default {
   common: {
     portal: 'Portal',
     logout: 'Keluar',
+    settings: 'Pengaturan',
+    language: 'Bahasa',
+    theme: 'Tema',
     save: 'Simpan',
     saved: 'Tersimpan',
     cancel: 'Batal',

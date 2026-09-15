@@ -13,6 +13,22 @@ function formatBytes(n) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
 }
 
+// Defensive backstop against any duplicate message id ending up in the
+// list (e.g. a WebSocket event and its triggering API response both
+// appending before the other's dedupe check ran) - ChatPage already
+// guards each append site, this just guarantees the render never shows a
+// duplicate bubble regardless of where one slipped in from.
+function dedupeById(messages) {
+  const seen = new Set()
+  const out = []
+  for (const m of messages) {
+    if (seen.has(m.id)) continue
+    seen.add(m.id)
+    out.push(m)
+  }
+  return out
+}
+
 function formatTime(iso) {
   const d = new Date(iso)
   const now = new Date()
@@ -111,7 +127,7 @@ export default function MessageThread({ me, conversation, messages, loading, onS
         {!loading && messages.length === 0 && (
           <p className="text-center text-xs text-muted-foreground">{t('chat.noMessages')}</p>
         )}
-        {messages.map((m) => (
+        {dedupeById(messages).map((m) => (
           <Bubble key={m.id} msg={m} mine={m.senderId === me?.id} />
         ))}
         <div ref={bottomRef} />

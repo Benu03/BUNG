@@ -6,8 +6,6 @@ import { Input } from './ui/input.jsx'
 import { Card } from './ui/card.jsx'
 import { Alert, AlertDescription } from './ui/alert.jsx'
 import Logo from './Logo.jsx'
-import ThemeToggle from './ThemeToggle.jsx'
-import LanguageToggle from './LanguageToggle.jsx'
 import ProfileModal from './ProfileModal.jsx'
 import NotificationBell from './NotificationBell.jsx'
 import ChatButton from './ChatButton.jsx'
@@ -144,8 +142,6 @@ export default function Dashboard({ user, onLogout, settings, onChangePassword }
             <span className="font-semibold tracking-tight">{settings.siteName}</span>
           </div>
           <div className="flex items-center gap-2">
-            <LanguageToggle className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
-            <ThemeToggle className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <CommandPalette className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <NotificationBell className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <ChatButton className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />

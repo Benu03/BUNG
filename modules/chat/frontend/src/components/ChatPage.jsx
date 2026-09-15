@@ -123,9 +123,16 @@ export default function ChatPage({ me }) {
     await openConversation(id)
   }
 
+  // Both of these dedupe by message id before appending. The backend
+  // pushes the new message over WebSocket to the sender too (see
+  // notifyNewMessage in handlers.go), and it does that BEFORE writing the
+  // HTTP response body - so the WS event routinely lands here before this
+  // function's own `await` resolves. Without the id check, the same
+  // message got appended twice (once from the WS handler below, once here
+  // unconditionally) - showed up as every sent message rendering doubled.
   const sendMessage = async (body) => {
     const msg = await api.sendMessage(selectedConversationId, body)
-    setMessages((prev) => [...prev, msg])
+    setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]))
     setConversations((prev) => {
       const idx = prev.findIndex((c) => c.id === selectedConversationId)
       if (idx === -1) return prev
@@ -139,7 +146,7 @@ export default function ChatPage({ me }) {
 
   const uploadAttachment = async (file) => {
     const msg = await api.uploadAttachment(selectedConversationId, file)
-    setMessages((prev) => [...prev, msg])
+    setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]))
     setConversations((prev) => {
       const idx = prev.findIndex((c) => c.id === selectedConversationId)
       if (idx === -1) return prev

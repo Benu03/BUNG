@@ -1,6 +1,8 @@
 import { KeyRound, LogOut, X } from 'lucide-react'
 import { Button } from './ui/button.jsx'
 import { Card, CardContent, CardHeader } from './ui/card.jsx'
+import ThemeToggle from './ThemeToggle.jsx'
+import LanguageToggle from './LanguageToggle.jsx'
 import { useTranslation } from '../lib/i18n.jsx'
 
 function initials(name) {
@@ -31,6 +33,14 @@ export default function ProfileModal({ user, onClose, onChangePassword, onLogout
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-2 pt-4">
+          <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+            <span className="text-sm">{t('common.language')}</span>
+            <LanguageToggle />
+          </div>
+          <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+            <span className="text-sm">{t('common.theme')}</span>
+            <ThemeToggle />
+          </div>
           <Button variant="outline" className="justify-start" onClick={() => { onClose(); onChangePassword() }}>
             <KeyRound />
             {t('dashboard.changePassword')}

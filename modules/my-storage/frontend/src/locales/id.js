@@ -2,6 +2,9 @@ export default {
   common: {
     portal: 'Portal',
     logout: 'Keluar',
+    settings: 'Pengaturan',
+    language: 'Bahasa',
+    theme: 'Tema',
     cancel: 'Batal',
     delete: 'Hapus',
     filterPlaceholder: 'Filter...',

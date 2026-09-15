@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowLeft, LogOut, Shield, Users as UsersIcon, LayoutGrid, Settings as SettingsIcon, ScrollText, Terminal } from 'lucide-react'
+import { ArrowLeft, LogOut, Shield, Users as UsersIcon, LayoutGrid, Settings as SettingsIcon, ScrollText, Terminal, SlidersHorizontal } from 'lucide-react'
 import Users from './components/Users.jsx'
 import Roles from './components/Roles.jsx'
 import Modules from './components/Modules.jsx'
@@ -7,8 +7,7 @@ import Settings from './components/Settings.jsx'
 import AuditLog from './components/AuditLog.jsx'
 import Logs from './components/Logs.jsx'
 import Logo from './components/Logo.jsx'
-import ThemeToggle from './components/ThemeToggle.jsx'
-import LanguageToggle from './components/LanguageToggle.jsx'
+import SettingsModal from './components/SettingsModal.jsx'
 import NotificationBell from './components/NotificationBell.jsx'
 import ChatButton from './components/ChatButton.jsx'
 import CommandPalette from './components/CommandPalette.jsx'
@@ -28,6 +27,7 @@ const TABS = [
 export default function App() {
   const { t } = useTranslation()
   const [active, setActive] = useState('users')
+  const [showSettings, setShowSettings] = useState(false)
   const current = TABS.find((t) => t.key === active)
 
   const logout = async () => {
@@ -47,8 +47,9 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <LanguageToggle className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
-            <ThemeToggle className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
+            <Button variant="ghost" size="icon" onClick={() => setShowSettings(true)} title={t('common.settings')} className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground">
+              <SlidersHorizontal className="h-4 w-4" />
+            </Button>
             <CommandPalette className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <NotificationBell className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <ChatButton className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
@@ -65,6 +66,8 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
 
       <main className="mx-auto max-w-5xl px-4 py-8">
         <nav className="mb-6 flex gap-1 border-b">

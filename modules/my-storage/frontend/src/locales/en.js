@@ -2,6 +2,9 @@ export default {
   common: {
     portal: 'Portal',
     logout: 'Logout',
+    settings: 'Settings',
+    language: 'Language',
+    theme: 'Theme',
     cancel: 'Cancel',
     delete: 'Delete',
     filterPlaceholder: 'Filter...',

@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, LogOut, LayoutGrid } from 'lucide-react'
+import { ArrowLeft, LogOut, LayoutGrid, SlidersHorizontal } from 'lucide-react'
 import BoardList from './components/BoardList.jsx'
 import Board from './components/Board.jsx'
 import Logo from './components/Logo.jsx'
-import ThemeToggle from './components/ThemeToggle.jsx'
-import LanguageToggle from './components/LanguageToggle.jsx'
+import SettingsModal from './components/SettingsModal.jsx'
 import NotificationBell from './components/NotificationBell.jsx'
 import ChatButton from './components/ChatButton.jsx'
 import CommandPalette from './components/CommandPalette.jsx'
@@ -16,6 +15,7 @@ export default function App() {
   const { t } = useTranslation()
   const [boardId, setBoardId] = useState(null)
   const [me, setMe] = useState(null)
+  const [showSettings, setShowSettings] = useState(false)
 
   useEffect(() => { api.me().then(setMe).catch(() => {}) }, [])
 
@@ -53,8 +53,9 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <LanguageToggle className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
-            <ThemeToggle className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
+            <Button variant="ghost" size="icon" onClick={() => setShowSettings(true)} title={t('common.settings')} className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground">
+              <SlidersHorizontal className="h-4 w-4" />
+            </Button>
             <CommandPalette className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <NotificationBell className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <ChatButton className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
@@ -71,6 +72,8 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
 
       <main className="mx-auto max-w-6xl px-4 py-8">
         {boardId
