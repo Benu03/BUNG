@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Trash2, UserPlus, X } from 'lucide-react'
+import { Trash2, X } from 'lucide-react'
 import { api } from '../api.js'
 import { Button } from './ui/button.jsx'
 import { Input } from './ui/input.jsx'
@@ -7,6 +7,7 @@ import { Label } from './ui/label.jsx'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.jsx'
 import { Alert, AlertDescription } from './ui/alert.jsx'
 import { useTranslation } from '../lib/i18n.jsx'
+import UserPicker from './UserPicker.jsx'
 
 // datetime-local inputs work in the browser's local time, with no
 // timezone info - these convert to/from that string and a real Date
@@ -27,9 +28,8 @@ function defaultStart() {
   return d
 }
 
-export default function EventModal({ event, me, onClose, onSaved, onDeleted }) {
+export default function EventModal({ event, me, onClose, onSaved, onCreated, onDeleted }) {
   const { t } = useTranslation()
-  const isEdit = !!event
   const initialStart = event ? new Date(event.startAt) : defaultStart()
   const initialEnd = event ? new Date(event.endAt) : new Date(initialStart.getTime() + 60 * 60 * 1000)
 
@@ -41,9 +41,20 @@ export default function EventModal({ event, me, onClose, onSaved, onDeleted }) {
   const [end, setEnd] = useState(allDay ? toLocalDateValue(initialEnd) : toLocalDateTimeValue(initialEnd))
   const [ownerId, setOwnerId] = useState(event?.ownerId)
   const [attendees, setAttendees] = useState([])
-  const [inviteUsername, setInviteUsername] = useState('')
+  const [allUsers, setAllUsers] = useState([])
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // currentId starts null when creating a brand-new event (no `event`
+  // prop yet) and becomes set the moment the first Save succeeds - at
+  // that point the modal switches into "edit" display (title, delete
+  // button, attendees section) *without closing*, so you can invite
+  // people to an event you just created without having to close and
+  // reopen it. This was the actual bug behind "attendees doesn't work":
+  // the whole attendees section used to be gated on the `event` prop
+  // being present, which is never true while still creating.
+  const [currentId, setCurrentId] = useState(event?.id || null)
+  const isEdit = !!currentId
 
   // isOwner is only meaningful once `me` has loaded - defaults to true
   // while creating (the creator is always the owner) and false until we
@@ -52,7 +63,7 @@ export default function EventModal({ event, me, onClose, onSaved, onDeleted }) {
   const isOwner = !isEdit || (me != null && ownerId != null && me.id === ownerId)
 
   useEffect(() => {
-    if (!isEdit) return
+    if (!event) return
     api.getEvent(event.id)
       .then((full) => {
         setOwnerId(full.ownerId)
@@ -60,6 +71,12 @@ export default function EventModal({ event, me, onClose, onSaved, onDeleted }) {
       })
       .catch((e) => setError(e.message))
   }, [event?.id])
+
+  // Fetched once regardless of create/edit mode, so the invite search box
+  // is ready the instant an id exists (right after the first Save).
+  useEffect(() => {
+    api.listUsers().then(setAllUsers).catch(() => {})
+  }, [])
 
   const toggleAllDay = (checked) => {
     setAllDay(checked)
@@ -92,8 +109,19 @@ export default function EventModal({ event, me, onClose, onSaved, onDeleted }) {
         endAt: endAt.toISOString(),
         allDay,
       }
-      const saved = isEdit ? await api.updateEvent(event.id, payload) : await api.createEvent(payload)
-      onSaved(saved)
+      if (isEdit) {
+        const saved = await api.updateEvent(currentId, payload)
+        onSaved(saved)
+      } else {
+        // First save of a brand-new event - stay open instead of closing,
+        // so the attendees section (which needs a real event id) becomes
+        // available right away.
+        const saved = await api.createEvent(payload)
+        setCurrentId(saved.id)
+        setOwnerId(saved.ownerId)
+        setAttendees([])
+        onCreated(saved)
+      }
     } catch (e) {
       setError(e.message)
     } finally {
@@ -104,21 +132,18 @@ export default function EventModal({ event, me, onClose, onSaved, onDeleted }) {
   const remove = async () => {
     if (!confirm(t('events.confirmDelete'))) return
     try {
-      await api.deleteEvent(event.id)
-      onDeleted(event.id)
+      await api.deleteEvent(currentId)
+      onDeleted(currentId)
     } catch (e) {
       setError(e.message)
     }
   }
 
-  const invite = async (e) => {
-    e.preventDefault()
-    if (!inviteUsername.trim()) return
+  const invite = async (user) => {
     setError('')
     try {
-      const attendee = await api.inviteAttendee(event.id, inviteUsername.trim())
+      const attendee = await api.inviteAttendee(currentId, user.username)
       setAttendees((prev) => [...prev, attendee])
-      setInviteUsername('')
     } catch (e) {
       setError(e.message)
     }
@@ -127,7 +152,7 @@ export default function EventModal({ event, me, onClose, onSaved, onDeleted }) {
   const removeAttendee = async (userId) => {
     if (!confirm(t('events.confirmRemoveAttendee'))) return
     try {
-      await api.removeAttendee(event.id, userId)
+      await api.removeAttendee(currentId, userId)
       setAttendees((prev) => prev.filter((a) => a.userId !== userId))
     } catch (e) {
       setError(e.message)
@@ -195,17 +220,14 @@ export default function EventModal({ event, me, onClose, onSaved, onDeleted }) {
                   {attendees.length === 0 && <p className="text-xs text-muted-foreground">-</p>}
                 </div>
                 {isOwner ? (
-                  <form onSubmit={invite} className="mt-1 flex gap-2">
-                    <Input
+                  <div className="mt-1">
+                    <UserPicker
+                      users={allUsers}
+                      excludeIds={[ownerId, ...attendees.map((a) => a.userId)]}
+                      onPick={invite}
                       placeholder={t('events.inviteUsername')}
-                      value={inviteUsername}
-                      onChange={(e) => setInviteUsername(e.target.value)}
-                      className="h-8"
                     />
-                    <Button type="button" onClick={invite} size="icon" className="h-8 w-8 shrink-0">
-                      <UserPlus className="h-3.5 w-3.5" />
-                    </Button>
-                  </form>
+                  </div>
                 ) : (
                   <p className="text-xs text-muted-foreground">{t('events.ownerOnlyHint')}</p>
                 )}

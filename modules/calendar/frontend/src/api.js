@@ -36,4 +36,6 @@ export const api = {
 
   inviteAttendee: (id, username) => request(`events/${id}/invite`, { method: 'POST', body: JSON.stringify({ username }) }),
   removeAttendee: (id, userId) => request(`events/${id}/invite/${userId}`, { method: 'DELETE' }),
+
+  listUsers: () => request('users'),
 }

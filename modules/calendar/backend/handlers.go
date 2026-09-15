@@ -210,3 +210,13 @@ func (a *api) removeAttendee(w http.ResponseWriter, r *http.Request) {
 	writeAudit(a.store.db, r, "event.uninvite", "event", eventID, map[string]any{"userId": userID})
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// listUsers powers the invite search box on the frontend.
+func (a *api) listUsers(w http.ResponseWriter, r *http.Request) {
+	users, err := a.store.ListAllUsers()
+	if err != nil {
+		handleErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, users)
+}

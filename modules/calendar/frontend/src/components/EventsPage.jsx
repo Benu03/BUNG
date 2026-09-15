@@ -63,6 +63,13 @@ export default function EventsPage({ me }) {
     setModalEvent(undefined)
   }
 
+  // Called after the *first* save of a brand-new event - unlike onSaved,
+  // this deliberately leaves the modal open (see EventModal) so the user
+  // can invite attendees right away, without an extra close-and-reopen.
+  const onCreated = (saved) => {
+    setEvents((prev) => [...prev, saved])
+  }
+
   const onDeleted = (id) => {
     setEvents((prev) => prev.filter((e) => e.id !== id))
     setModalEvent(undefined)
@@ -144,6 +151,7 @@ export default function EventsPage({ me }) {
           me={me}
           onClose={() => setModalEvent(undefined)}
           onSaved={onSaved}
+          onCreated={onCreated}
           onDeleted={onDeleted}
         />
       )}

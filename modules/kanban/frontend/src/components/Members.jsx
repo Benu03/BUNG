@@ -1,28 +1,27 @@
 import { useEffect, useState } from 'react'
-import { Crown, Trash2, UserPlus, X } from 'lucide-react'
+import { Crown, Trash2, X } from 'lucide-react'
 import { api } from '../api.js'
 import { Button } from './ui/button.jsx'
-import { Input } from './ui/input.jsx'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.jsx'
 import { Alert, AlertDescription } from './ui/alert.jsx'
 import { useTranslation } from '../lib/i18n.jsx'
+import UserPicker from './UserPicker.jsx'
 
 export default function Members({ board, isOwner, onClose, onChanged }) {
   const { t } = useTranslation()
   const [members, setMembers] = useState([])
-  const [username, setUsername] = useState('')
+  const [allUsers, setAllUsers] = useState([])
   const [error, setError] = useState('')
 
   const load = () => api.listMembers(board.id).then(setMembers).catch((e) => setError(e.message))
 
   useEffect(() => { load() }, [board.id])
+  useEffect(() => { api.listUsers().then(setAllUsers).catch(() => {}) }, [])
 
-  const submit = async (e) => {
-    e.preventDefault()
+  const invite = async (user) => {
     setError('')
     try {
-      await api.addMember(board.id, username.trim())
-      setUsername('')
+      await api.addMember(board.id, user.username)
       load()
       onChanged?.()
     } catch (e) {
@@ -71,17 +70,12 @@ export default function Members({ board, isOwner, onClose, onChanged }) {
           </div>
 
           {isOwner && (
-            <form onSubmit={submit} className="flex gap-2">
-              <Input
-                placeholder={t('members.inviteUsername')}
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="h-9"
-              />
-              <Button type="submit" size="icon" className="shrink-0">
-                <UserPlus className="h-4 w-4" />
-              </Button>
-            </form>
+            <UserPicker
+              users={allUsers}
+              excludeIds={members.map((m) => m.userId)}
+              onPick={invite}
+              placeholder={t('members.inviteUsername')}
+            />
           )}
           {!isOwner && (
             <p className="text-xs text-muted-foreground">{t('members.ownerOnlyHint')}</p>

@@ -31,6 +31,8 @@ func main() {
 	mux.HandleFunc("POST /events/{id}/invite", a.invite)
 	mux.HandleFunc("DELETE /events/{id}/invite/{userId}", a.removeAttendee)
 
+	mux.HandleFunc("GET /users", a.listUsers) // for the invite search box
+
 	log.Printf("calendar-backend listening on :%s", port)
 	if err := http.ListenAndServe(":"+port, mux); err != nil {
 		log.Fatal(err)

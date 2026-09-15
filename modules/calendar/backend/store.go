@@ -226,3 +226,25 @@ func (s *Store) RemoveAttendee(ownerID, eventID, userID string) error {
 	_, err = s.db.Exec(`DELETE FROM event_attendees WHERE event_id = $1 AND user_id = $2`, eventID, userID)
 	return err
 }
+
+// ListAllUsers is a cross-schema read of app-maintenance's user directory,
+// used to power the invite search box (so users pick from a filtered
+// list instead of having to type an exact username) - same pattern as
+// kanban's ListAllUsers.
+func (s *Store) ListAllUsers() ([]*AttendeeRef, error) {
+	rows, err := s.db.Query(`SELECT id, username, full_name FROM app_maintenance.users ORDER BY username`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := []*AttendeeRef{}
+	for rows.Next() {
+		var u AttendeeRef
+		if err := rows.Scan(&u.UserID, &u.Username, &u.FullName); err != nil {
+			return nil, err
+		}
+		users = append(users, &u)
+	}
+	return users, rows.Err()
+}
