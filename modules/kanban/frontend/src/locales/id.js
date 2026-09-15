@@ -39,6 +39,8 @@ export default {
     confirmDeleteColumn: 'Hapus kolom ini beserta kartunya?',
     confirmDeleteCard: 'Hapus kartu ini?',
     confirmDeleteBoard: 'Hapus board ini beserta isinya?',
+    live: 'Live - perubahan dari anggota lain muncul otomatis',
+    reconnecting: 'Menyambungkan ulang...',
   },
   members: {
     title: 'Anggota',

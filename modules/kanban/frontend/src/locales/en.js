@@ -39,6 +39,8 @@ export default {
     confirmDeleteColumn: 'Delete this column and its cards?',
     confirmDeleteCard: 'Delete this card?',
     confirmDeleteBoard: 'Delete this board and everything in it?',
+    live: 'Live - updates from other members appear automatically',
+    reconnecting: 'Reconnecting...',
   },
   members: {
     title: 'Members',

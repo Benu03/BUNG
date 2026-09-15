@@ -10,6 +10,7 @@ import (
 
 type api struct {
 	store *Store
+	hub   *hub
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -115,6 +116,7 @@ func (a *api) updateBoard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeAudit(a.store.db, r, "board.update", "board", b.ID, map[string]any{"name": b.Name})
+	a.hub.broadcast(b.ID, "board.updated", currentUserID(r))
 	writeJSON(w, http.StatusOK, b)
 }
 
@@ -125,6 +127,7 @@ func (a *api) deleteBoard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeAudit(a.store.db, r, "board.delete", "board", id, nil)
+	a.hub.broadcast(id, "board.deleted", currentUserID(r))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -167,6 +170,7 @@ func (a *api) addMember(w http.ResponseWriter, r *http.Request) {
 			"/kanban/",
 		)
 	}
+	a.hub.broadcast(boardID, "member.added", currentUserID(r))
 	writeJSON(w, http.StatusCreated, m)
 }
 
@@ -177,6 +181,7 @@ func (a *api) removeMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeAudit(a.store.db, r, "board.remove_member", "board", boardID, map[string]any{"userId": userID})
+	a.hub.broadcast(boardID, "member.removed", currentUserID(r))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -204,6 +209,7 @@ func (a *api) createColumn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeAudit(a.store.db, r, "column.create", "column", c.ID, map[string]any{"name": c.Name, "boardId": c.BoardID})
+	a.hub.broadcast(c.BoardID, "column.created", currentUserID(r))
 	writeJSON(w, http.StatusCreated, c)
 }
 
@@ -219,16 +225,19 @@ func (a *api) updateColumn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeAudit(a.store.db, r, "column.update", "column", c.ID, map[string]any{"name": c.Name})
+	a.hub.broadcast(c.BoardID, "column.updated", currentUserID(r))
 	writeJSON(w, http.StatusOK, c)
 }
 
 func (a *api) deleteColumn(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	boardID, _ := a.store.boardIDForColumn(id) // resolved before delete - the row won't exist afterward
 	if err := a.store.DeleteColumn(currentUserID(r), id); err != nil {
 		handleErr(w, err)
 		return
 	}
 	writeAudit(a.store.db, r, "column.delete", "column", id, nil)
+	a.hub.broadcast(boardID, "column.deleted", currentUserID(r))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -246,6 +255,9 @@ func (a *api) createCard(w http.ResponseWriter, r *http.Request) {
 		handleErr(w, err)
 		return
 	}
+	if boardID, err := a.store.boardIDForColumn(c.ColumnID); err == nil {
+		a.hub.broadcast(boardID, "card.created", currentUserID(r))
+	}
 	writeJSON(w, http.StatusCreated, c)
 }
 
@@ -259,6 +271,9 @@ func (a *api) updateCard(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		handleErr(w, err)
 		return
+	}
+	if boardID, err := a.store.boardIDForColumn(c.ColumnID); err == nil {
+		a.hub.broadcast(boardID, "card.updated", currentUserID(r))
 	}
 	writeJSON(w, http.StatusOK, c)
 }
@@ -277,13 +292,19 @@ func (a *api) moveCard(w http.ResponseWriter, r *http.Request) {
 		handleErr(w, err)
 		return
 	}
+	if boardID, err := a.store.boardIDForColumn(c.ColumnID); err == nil {
+		a.hub.broadcast(boardID, "card.moved", currentUserID(r))
+	}
 	writeJSON(w, http.StatusOK, c)
 }
 
 func (a *api) deleteCard(w http.ResponseWriter, r *http.Request) {
-	if err := a.store.DeleteCard(currentUserID(r), r.PathValue("id")); err != nil {
+	id := r.PathValue("id")
+	boardID, _ := a.store.boardIDForCard(id) // resolved before delete - the row won't exist afterward
+	if err := a.store.DeleteCard(currentUserID(r), id); err != nil {
 		handleErr(w, err)
 		return
 	}
+	a.hub.broadcast(boardID, "card.deleted", currentUserID(r))
 	w.WriteHeader(http.StatusNoContent)
 }

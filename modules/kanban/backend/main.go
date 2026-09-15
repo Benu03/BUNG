@@ -15,7 +15,7 @@ func main() {
 	db := openDB()
 	defer db.Close()
 
-	a := &api{store: NewStore(db)}
+	a := &api{store: NewStore(db), hub: newHub()}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /health", a.health)
@@ -27,6 +27,7 @@ func main() {
 	mux.HandleFunc("PUT /boards/{id}", a.updateBoard)
 	mux.HandleFunc("DELETE /boards/{id}", a.deleteBoard)
 	mux.HandleFunc("POST /boards/{id}/columns", a.createColumn)
+	mux.HandleFunc("GET /boards/{id}/ws", a.boardWS) // real-time updates, see hub.go
 
 	mux.HandleFunc("GET /boards/{id}/members", a.listMembers)
 	mux.HandleFunc("POST /boards/{id}/members", a.addMember)

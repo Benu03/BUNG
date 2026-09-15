@@ -134,10 +134,43 @@ export default function Board({ boardId, onBack, me }) {
   const [error, setError] = useState('')
   const [newColumnName, setNewColumnName] = useState('')
   const [showMembers, setShowMembers] = useState(false)
+  const [live, setLive] = useState(false)
 
   const load = () => api.getBoard(boardId).then(setBoard).catch((e) => setError(e.message))
 
   useEffect(() => { load() }, [boardId])
+
+  // Real-time updates (see kanban-backend's hub.go): any other member's
+  // change to this board arrives as a small event over this socket - we
+  // don't bother reconciling a fine-grained patch, just refetch the whole
+  // board, same as the local mutations above already do via onChanged.
+  // Reconnects on its own (with a short delay) if the connection drops,
+  // e.g. nginx/backend restart.
+  useEffect(() => {
+    if (!boardId) return
+    let ws
+    let reconnectTimer
+    let closedByUs = false
+
+    const connect = () => {
+      const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      ws = new WebSocket(`${proto}//${window.location.host}/kanban/api/boards/${boardId}/ws`)
+      ws.onopen = () => setLive(true)
+      ws.onmessage = () => load()
+      ws.onclose = () => {
+        setLive(false)
+        if (!closedByUs) reconnectTimer = setTimeout(connect, 2000)
+      }
+      ws.onerror = () => ws.close()
+    }
+    connect()
+
+    return () => {
+      closedByUs = true
+      clearTimeout(reconnectTimer)
+      ws?.close()
+    }
+  }, [boardId])
 
   const addColumn = async (e) => {
     e.preventDefault()
@@ -165,7 +198,13 @@ export default function Board({ boardId, onBack, me }) {
           <ArrowLeft />
           {t('board.boards')}
         </Button>
-        <h2 className="flex-1 text-lg font-semibold tracking-tight">{board.name}</h2>
+        <h2 className="flex flex-1 items-center gap-2 text-lg font-semibold tracking-tight">
+          {board.name}
+          <span
+            title={live ? t('board.live') : t('board.reconnecting')}
+            className={`h-1.5 w-1.5 rounded-full ${live ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`}
+          />
+        </h2>
         <Button variant="outline" size="sm" onClick={() => setShowMembers(true)}>
           <Users />
           {t('board.members')}
