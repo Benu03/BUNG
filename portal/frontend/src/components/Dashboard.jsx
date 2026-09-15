@@ -137,14 +137,15 @@ export default function Dashboard({ user, onLogout, settings, onChangePassword }
 
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{t('dashboard.yourModules')}</h1>
-            <p className="text-sm text-muted-foreground">{t('dashboard.pickModule')}</p>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {t(greetingKey())}, {(user.fullName || user.username).split(' ')[0]} 👋
+            </h1>
           </div>
           {modules.length > 0 && (
             <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2">
               <Search className="h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder={t('common.filterPlaceholder')}
+                placeholder={t('dashboard.searchPlaceholder')}
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
                 className="h-8 w-48 border-0 shadow-none focus-visible:ring-0"
