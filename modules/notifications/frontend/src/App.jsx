@@ -3,6 +3,7 @@ import NotificationsPage from './components/NotificationsPage.jsx'
 import Logo from './components/Logo.jsx'
 import ThemeToggle from './components/ThemeToggle.jsx'
 import LanguageToggle from './components/LanguageToggle.jsx'
+import CommandPalette from './components/CommandPalette.jsx'
 import { Button } from './components/ui/button.jsx'
 import { useTranslation } from './lib/i18n.jsx'
 
@@ -33,6 +34,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <LanguageToggle className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <ThemeToggle className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
+            <CommandPalette className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <Button size="sm" asChild className="border border-white/25 bg-white/10 text-primary-foreground shadow-none hover:bg-white/20">
               <a href="/">
                 <ArrowLeft />

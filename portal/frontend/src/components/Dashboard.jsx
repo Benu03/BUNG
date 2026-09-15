@@ -8,6 +8,7 @@ import ThemeToggle from './ThemeToggle.jsx'
 import LanguageToggle from './LanguageToggle.jsx'
 import ProfileModal from './ProfileModal.jsx'
 import NotificationBell from './NotificationBell.jsx'
+import CommandPalette from './CommandPalette.jsx'
 import { useTranslation } from '../lib/i18n.jsx'
 
 const FAVORITES_KEY = 'bung-favorite-modules'
@@ -91,6 +92,7 @@ export default function Dashboard({ user, onLogout, settings, onChangePassword }
           <div className="flex items-center gap-2">
             <LanguageToggle className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <ThemeToggle className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
+            <CommandPalette className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <NotificationBell className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <button
               onClick={() => setShowProfile(true)}

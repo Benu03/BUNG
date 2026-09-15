@@ -39,6 +39,19 @@ export default function EventsPage({ me }) {
 
   useEffect(() => { load() }, [])
 
+  // Deep link from the global command palette (?event=<id>) - resolve the
+  // full event (EventModal needs more than just an id, unlike ticket/board
+  // deep links) then open it, and strip the param so a refresh doesn't
+  // reopen it.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('event')
+    if (!id) return
+    api.getEvent(id).then(setModalEvent).catch(() => {})
+    const url = new URL(window.location.href)
+    url.searchParams.delete('event')
+    window.history.replaceState({}, '', url)
+  }, [])
+
   const q = filter.trim().toLowerCase()
   const filtered = useMemo(
     () => events.filter((e) => !q || [e.title, e.description, e.location].some((v) => v?.toLowerCase().includes(q))),

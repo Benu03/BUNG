@@ -49,6 +49,19 @@ export default function TicketsPage() {
       .catch((e) => setError(e.message))
   }
 
+  // Deep link from the global command palette (?ticket=<id>) - TicketModal
+  // just needs the id (it fetches the rest itself), so this is a plain
+  // id passthrough, unlike calendar's event deep link. Strip the param
+  // afterward so a refresh doesn't reopen it.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('ticket')
+    if (!id) return
+    setModalTicket(id)
+    const url = new URL(window.location.href)
+    url.searchParams.delete('ticket')
+    window.history.replaceState({}, '', url)
+  }, [])
+
   useEffect(() => { load() }, [])
 
   const userName = (id) => {

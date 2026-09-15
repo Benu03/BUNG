@@ -1,0 +1,39 @@
+# Same log-rotation cap as the root docker-compose.yml - repeated per file
+# since YAML anchors don't cross the files `include:` merges in.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  search-backend:
+    build:
+      context: ./backend
+    environment:
+      - PORT=${SEARCH_BACKEND_PORT:-8080}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-bung}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-bung}
+      - DB_NAME=${POSTGRES_DB:-bung}
+      - DB_SSLMODE=disable
+    networks:
+      - app-network
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      # Reads across every one of these modules' own schemas directly
+      # (cross-schema, see store.go) - they need to exist first.
+      app-maintenance-backend:
+        condition: service_started
+      kanban-backend:
+        condition: service_started
+      my-storage-backend:
+        condition: service_started
+      calendar-backend:
+        condition: service_started
+      ticketing-backend:
+        condition: service_started
+    restart: unless-stopped
