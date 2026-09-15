@@ -11,7 +11,7 @@ import { useTranslation } from '../lib/i18n.jsx'
 // which folds these two rows in alongside actual profile info; every
 // other frontend doesn't have a profile concept of its own, so this
 // smaller modal is duplicated into each one's header instead, same
-// pattern as NotificationBell/ChatButton.
+// pattern as NotificationBell.
 export default function SettingsModal({ onClose }) {
   const { t } = useTranslation()
 

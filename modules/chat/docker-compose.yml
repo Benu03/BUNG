@@ -42,6 +42,11 @@ services:
       # "add friend" search and the broadcast admin check).
       app-maintenance-backend:
         condition: service_started
+      # A new message to an offline recipient drops a row into
+      # notifications.inbox (cross-schema write, see notify.go) - that
+      # schema must exist first.
+      notifications-backend:
+        condition: service_started
     restart: unless-stopped
 
 volumes:

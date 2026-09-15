@@ -4,7 +4,6 @@ import NotificationsPage from './components/NotificationsPage.jsx'
 import Logo from './components/Logo.jsx'
 import SettingsModal from './components/SettingsModal.jsx'
 import CommandPalette from './components/CommandPalette.jsx'
-import ChatButton from './components/ChatButton.jsx'
 import { Button } from './components/ui/button.jsx'
 import { useTranslation } from './lib/i18n.jsx'
 
@@ -38,7 +37,6 @@ export default function App() {
               <SlidersHorizontal className="h-4 w-4" />
             </Button>
             <CommandPalette className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
-            <ChatButton className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <Button size="sm" asChild className="border border-white/25 bg-white/10 text-primary-foreground shadow-none hover:bg-white/20">
               <a href="/">
                 <ArrowLeft />

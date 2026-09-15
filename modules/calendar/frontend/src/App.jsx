@@ -4,7 +4,6 @@ import EventsPage from './components/EventsPage.jsx'
 import Logo from './components/Logo.jsx'
 import SettingsModal from './components/SettingsModal.jsx'
 import NotificationBell from './components/NotificationBell.jsx'
-import ChatButton from './components/ChatButton.jsx'
 import CommandPalette from './components/CommandPalette.jsx'
 import { Button } from './components/ui/button.jsx'
 import { api } from './api.js'
@@ -44,7 +43,6 @@ export default function App() {
             </Button>
             <CommandPalette className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <NotificationBell className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
-            <ChatButton className="text-primary-foreground hover:bg-white/15 hover:text-primary-foreground" />
             <Button size="sm" asChild className="border border-white/25 bg-white/10 text-primary-foreground shadow-none hover:bg-white/20">
               <a href="/">
                 <ArrowLeft />

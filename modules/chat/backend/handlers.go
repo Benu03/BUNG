@@ -308,8 +308,12 @@ func (a *api) markRead(w http.ResponseWriter, r *http.Request) {
 }
 
 // notifyNewMessage pushes the new message to both participants over
-// WebSocket (best-effort - offline users just see it next time they load
-// the conversation).
+// WebSocket, and additionally drops a row into notifications.inbox for
+// the recipient if they don't currently have chat open in any tab (see
+// hub.go's isOnline) - if they're online they'll see it live over this
+// same socket, so a separate notification would just be noise; if
+// they're not, this is the only way they'll hear about it short of
+// reopening chat themselves.
 func (a *api) notifyNewMessage(senderID, conversationID string, msg *Message) {
 	otherID, err := a.store.conversationOtherUser(conversationID, senderID)
 	if err != nil {
@@ -318,6 +322,33 @@ func (a *api) notifyNewMessage(senderID, conversationID string, msg *Message) {
 	payload := map[string]any{"type": "message", "conversationId": conversationID, "message": msg}
 	a.hub.send(otherID, payload)
 	a.hub.send(senderID, payload)
+
+	if a.hub.isOnline(otherID) {
+		return
+	}
+	sender, err := a.store.getUserRef(senderID)
+	if err != nil {
+		return
+	}
+	body := msg.Body
+	if body == "" && msg.AttachmentFilename != nil {
+		body = "Sent a file: " + *msg.AttachmentFilename
+	}
+	if len(body) > 120 {
+		body = body[:117] + "..."
+	}
+	notify(a.store.db, otherID, "chat", "chat.message",
+		"New message from "+displayName(sender),
+		body,
+		"/chat/",
+	)
+}
+
+func displayName(u *UserRef) string {
+	if u.FullName != "" {
+		return u.FullName
+	}
+	return u.Username
 }
 
 // ---- broadcasts ----

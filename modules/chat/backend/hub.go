@@ -49,6 +49,19 @@ func (h *hub) unregister(userID string, c *websocket.Conn) {
 	}
 }
 
+// isOnline reports whether userID currently has at least one open
+// connection - i.e. they have the chat page open right now, in some tab.
+// Used to decide whether a new message also needs a row in
+// notifications.inbox (see notify.go): if they're online they'll get it
+// live over this same socket, so a separate notification would just be
+// noise; if they're not, this is the only way they'll ever hear about it
+// short of reopening chat themselves.
+func (h *hub) isOnline(userID string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return len(h.conns[userID]) > 0
+}
+
 func (h *hub) send(userID string, payload any) {
 	if userID == "" {
 		return
